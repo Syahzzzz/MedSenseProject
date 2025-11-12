@@ -10,7 +10,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // --- Start of connection test ---
+  // Start of connection test 
   try {
     // Use a non-existent document reference to avoid creating data
     final docRef = db.collection("test_connection").doc("test_doc");
