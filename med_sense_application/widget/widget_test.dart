@@ -19,9 +19,9 @@ void main() {
     // This 'pumpWidget' call builds the UI.
     await tester.pumpWidget(const MyApp());
 
-    // --- Test 1: Verify the "Dental Clinic" text is on the screen ---
-    // This line looks for a widget that contains the text 'Dental Clinic'.
-    expect(find.text('Dental Clinic'), findsOneWidget);
+    // --- Test 1: Verify the "MedSense" text is on the screen ---
+    // This line looks for a widget that contains the text 'MedSense'.
+    expect(find.text('MedSense'), findsOneWidget);
 
     // --- Test 2: Verify the "Create Account" button text is there ---
     expect(find.text('Create Account'), findsOneWidget);

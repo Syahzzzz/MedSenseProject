@@ -62,7 +62,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     // This is the gold/yellow color from your design
-    final Color primaryColor = const Color(0xFFE6B953);
+    final Color primaryColor = const Color.fromARGB(255, 229, 232, 6);
 
     return Scaffold(
       // The background color for the top part of the screen
@@ -89,7 +89,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     const SizedBox(height: 15),
                     // --- Header Text ---
                     const Text(
-                      'Dental Clinic',
+                      'MedSense',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 24,
@@ -166,7 +166,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       const SizedBox(height: 5),
                       const Text(
-                        'Your Smile Healthy',
+                        'You Healthy',
                         style: TextStyle(
                           color: Colors.black,
                           fontSize: 20,
