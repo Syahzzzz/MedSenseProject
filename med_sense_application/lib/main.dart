@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  // Ensure Flutter widgets are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: 'https://afdhbiquywcoykiltbnf.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZGhiaXF1eXdjb3lraWx0Ym5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzMDk3ODMsImV4cCI6MjA3ODg4NTc4M30.VbTd-yMc7QszVJKtb9HJHtOHxSJyPwWOIvM5BCkfU8Q',
+  );
+
   runApp(const MyApp());
 }
 
@@ -33,11 +43,178 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   // --- STATE & VARIABLES ---
-  // add state variables here for email/password controllers
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _supabase = Supabase.instance.client;
+  bool _isLoading = false;
+
+  // --- LIFECYCLE METHODS ---
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   // --- FUNCTIONS & LOGIC ---
-  // add login and create account functions here.
+  Future<void> _showAuthModal(bool isSignUp) async {
+    // Reset form fields
+    _formKey.currentState?.reset();
+    _emailController.clear();
+    _passwordController.clear();
 
+    // Show the modal
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Allows sheet to grow and avoid keyboard
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (context) {
+        // Use padding to avoid the keyboard
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            top: 20,
+            left: 30,
+            right: 30,
+          ),
+          child: _buildAuthForm(isSignUp),
+        );
+      },
+    );
+  }
+
+  Widget _buildAuthForm(bool isSignUp) {
+    // Use StatefulBuilder to manage the loading state *inside* the modal
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // Take only needed space
+            children: [
+              Text(
+                isSignUp ? 'Create Account' : 'Sign In',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Email Field
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) {
+                  if (value == null || value.isEmpty || !value.contains('@')) {
+                    return 'Please enter a valid email';
+                  }
+                  return null;
+                },
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 10),
+              // Password Field
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty || value.length < 6) {
+                    return 'Password must be at least 6 characters';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 30),
+              // Submit Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : () async {
+                    // Validate the form
+                    if (_formKey.currentState!.validate()) {
+                      setModalState(() {
+                        _isLoading = true;
+                      });
+
+                      try {
+                        if (isSignUp) {
+                          // --- Create Account Logic ---
+                          await _supabase.auth.signUp(
+                            email: _emailController.text.trim(),
+                            password: _passwordController.text.trim(),
+                          );
+                          // --- FIX: Use context.mounted ---
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Success! Check your email for confirmation.')),
+                            );
+                          }
+                        } else {
+                          // --- Login Logic ---
+                          await _supabase.auth.signInWithPassword(
+                            email: _emailController.text.trim(),
+                            password: _passwordController.text.trim(),
+                          );
+                        }
+                        // --- FIX: Use context.mounted ---
+                        if (context.mounted) {
+                          Navigator.of(context).pop(); // Close bottom sheet on success
+                        }
+                      } on AuthException catch (e) {
+                        // --- FIX: Use context.mounted ---
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.message)),
+                          );
+                        }
+                      } catch (e) {
+                        // --- FIX: Use context.mounted ---
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('An unexpected error occurred')),
+                          );
+                        }
+                      } finally {
+                        // --- FIX: Use context.mounted ---
+                        if (context.mounted) {
+                          setModalState(() {
+                            _isLoading = false;
+                          });
+                        }
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFBC02D), // Use primary color
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                        )
+                      : Text(isSignUp ? 'Sign Up' : 'Sign In', style: const TextStyle(fontSize: 16)),
+                ),
+              ),
+              const SizedBox(height: 30), // Space at the bottom
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // --- BUILD METHOD ---
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = const Color(0xFFFBC02D);
@@ -94,7 +271,6 @@ class _MyHomePageState extends State<MyHomePage> {
                       const SizedBox(height: 40), // Space from top of card
 
                       // --- Placeholder Image ---
-                      // You should replace this with your own Image.asset()
                       ClipRRect(
                         borderRadius: BorderRadius.circular(20),
                         child: Image.asset(
@@ -131,13 +307,12 @@ class _MyHomePageState extends State<MyHomePage> {
                         height: 55, // Set button height
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Implement Create Account navigation
+                            _showAuthModal(true); // true = isSignUp
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: Colors.black,
                             elevation: 1,
-
                             side: BorderSide(color: Colors.grey[300]!),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),
@@ -155,7 +330,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         height: 55, // Set button height
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Implement Login logic
+                            _showAuthModal(false); // false = isSignIn
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
