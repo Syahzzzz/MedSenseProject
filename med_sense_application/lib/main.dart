@@ -116,24 +116,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       // You should replace this with your own Image.asset()
                       ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        child: Image.network(
-                          'c:\\medsense_project\\images\\Doctors-cuate.png',
+                        child: Image.asset(
+                          'images/Doctors-cuate.png',
                           width: 300,
                           height: 250,
                           fit: BoxFit.contain,
-                          // Fallback in case the network image fails
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 300,
-                              height: 250,
-                              color: Colors.grey[200],
-                              child: Icon(
-                                Icons.medical_services_outlined,
-                                size: 150,
-                                color: Colors.grey[400],
-                              ),
-                            );
-                          },
                         ),
                       ),
                       const SizedBox(height: 30),
