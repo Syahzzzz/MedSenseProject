@@ -1,25 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'firebase_options.dart'; 
 
-final db = FirebaseFirestore.instance;
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-
-  try {
-    // Use a non-existent document reference to avoid creating data
-    final docRef = db.collection("test_connection").doc("test_doc");
-    await docRef.get();
-    print("✅ Firebase connection successful: Able to reach Firestore.");
-  } on Exception catch (e) {
-    print("❌ Firebase connection failed: $e");
-  }
-  
+void main() {
   runApp(const MyApp());
 }
 

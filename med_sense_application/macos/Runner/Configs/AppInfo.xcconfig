@@ -8,7 +8,7 @@
 PRODUCT_NAME = med_sense_application
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.medSenseApplication
+PRODUCT_BUNDLE_IDENTIFIER = com.example.med_sense_application
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2025 com.example. All rights reserved.
