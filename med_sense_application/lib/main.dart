@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'login.dart';
+import 'signup.dart';
 
 Future<void> main() async {
-  // Ensure Flutter widgets are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Supabase
@@ -21,200 +22,21 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MedSense',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // CHANGED: Updated seedColor to a yellow shade to match the design
         colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFFBC02D)),
+          seedColor: const Color(0xFFFBC02D),
+        ),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Welcome'),
-      debugShowCheckedModeBanner: false,
+      home: const MyHomePage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
+class MyHomePage extends StatelessWidget {
+  const MyHomePage({super.key});
 
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  // --- STATE & VARIABLES ---
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  final _supabase = Supabase.instance.client;
-  bool _isLoading = false;
-
-  // --- LIFECYCLE METHODS ---
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  // --- FUNCTIONS & LOGIC ---
-  Future<void> _showAuthModal(bool isSignUp) async {
-    // Reset form fields
-    _formKey.currentState?.reset();
-    _emailController.clear();
-    _passwordController.clear();
-
-    // Show the modal
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, // Allows sheet to grow and avoid keyboard
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      builder: (context) {
-        // Use padding to avoid the keyboard
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            top: 20,
-            left: 30,
-            right: 30,
-          ),
-          child: _buildAuthForm(isSignUp),
-        );
-      },
-    );
-  }
-
-  Widget _buildAuthForm(bool isSignUp) {
-    // Use StatefulBuilder to manage the loading state *inside* the modal
-    return StatefulBuilder(
-      builder: (context, setModalState) {
-        return Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // Take only needed space
-            children: [
-              Text(
-                isSignUp ? 'Create Account' : 'Sign In',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Email Field
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator: (value) {
-                  if (value == null || value.isEmpty || !value.contains('@')) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 10),
-              // Password Field
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty || value.length < 6) {
-                    return 'Password must be at least 6 characters';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 30),
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : () async {
-                    // Validate the form
-                    if (_formKey.currentState!.validate()) {
-                      setModalState(() {
-                        _isLoading = true;
-                      });
-
-                      try {
-                        if (isSignUp) {
-                          // --- Create Account Logic ---
-                          await _supabase.auth.signUp(
-                            email: _emailController.text.trim(),
-                            password: _passwordController.text.trim(),
-                          );
-                          // --- FIX: Use context.mounted ---
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Success! Check your email for confirmation.')),
-                            );
-                          }
-                        } else {
-                          // --- Login Logic ---
-                          await _supabase.auth.signInWithPassword(
-                            email: _emailController.text.trim(),
-                            password: _passwordController.text.trim(),
-                          );
-                        }
-                        // --- FIX: Use context.mounted ---
-                        if (context.mounted) {
-                          Navigator.of(context).pop(); // Close bottom sheet on success
-                        }
-                      } on AuthException catch (e) {
-                        // --- FIX: Use context.mounted ---
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(e.message)),
-                          );
-                        }
-                      } catch (e) {
-                        // --- FIX: Use context.mounted ---
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('An unexpected error occurred')),
-                          );
-                        }
-                      } finally {
-                        // --- FIX: Use context.mounted ---
-                        if (context.mounted) {
-                          setModalState(() {
-                            _isLoading = false;
-                          });
-                        }
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFBC02D), // Use primary color
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
-                        )
-                      : Text(isSignUp ? 'Sign Up' : 'Sign In', style: const TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 30), // Space at the bottom
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // --- BUILD METHOD ---
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = const Color(0xFFFBC02D);
@@ -223,22 +45,48 @@ class _MyHomePageState extends State<MyHomePage> {
       backgroundColor: primaryColor,
       body: Stack(
         children: [
-          // --- Top Header Content ---
+          // --- Top Header Content (UPDATED STYLE) ---
           SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                // Padding for the header content
-                padding: const EdgeInsets.only(top: 60.0, left: 40, right: 40),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min, // Take only needed space
+                padding: const EdgeInsets.only(top: 50.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Icon with translucent background
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.health_and_safety_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Styled Text
                     const Text(
                       'MedSense',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(1, 1),
+                            blurRadius: 4.0,
+                            color: Colors.black26,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -260,29 +108,29 @@ class _MyHomePageState extends State<MyHomePage> {
                   topRight: Radius.circular(40),
                 ),
               ),
-              // use SingleChildScrollView to prevent overflow on small phones
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.all(30.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 40.0),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 40), // Space from top of card
-
-                      // --- Placeholder Image ---
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
+                      // --- Image ---
+                      SizedBox(
+                        height: 250,
                         child: Image.asset(
-                          'images/Doctors-cuate.png',
-                          width: 300,
-                          height: 250,
+                          'images/logo.png',
                           fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[200],
+                              alignment: Alignment.center,
+                              child: const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+                            );
+                          },
                         ),
                       ),
+                      
                       const SizedBox(height: 30),
-
-                      // --- Subtitle Text ---
                       const Text(
                         'Hey there! Let\'s Keep',
                         style: TextStyle(
@@ -295,8 +143,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         'You Healthy',
                         style: TextStyle(
                           color: Colors.black,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 26, // Slightly larger
+                          fontWeight: FontWeight.w900, // Bolder
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -304,22 +152,28 @@ class _MyHomePageState extends State<MyHomePage> {
                       // --- Create Account Button ---
                       SizedBox(
                         width: double.infinity,
-                        height: 55, // Set button height
-                        child: ElevatedButton(
+                        height: 55,
+                        child: OutlinedButton(
                           onPressed: () {
-                            _showAuthModal(true); // true = isSignUp
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SignupPage()),
+                            );
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            elevation: 1,
-                            side: BorderSide(color: Colors.grey[300]!),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300, width: 2),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),
                             ),
                           ),
-                          child: const Text('Create Account',
-                              style: TextStyle(fontSize: 16)),
+                          child: const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 16, 
+                              color: Colors.black, 
+                              fontWeight: FontWeight.w700
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 15),
@@ -327,24 +181,32 @@ class _MyHomePageState extends State<MyHomePage> {
                       // --- Login Button ---
                       SizedBox(
                         width: double.infinity,
-                        height: 55, // Set button height
+                        height: 55,
                         child: ElevatedButton(
                           onPressed: () {
-                            _showAuthModal(false); // false = isSignIn
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginPage()),
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
                             foregroundColor: Colors.white,
-                            elevation: 1,
+                            elevation: 4,
+                            shadowColor: primaryColor.withValues(alpha: 0.4),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),
                             ),
                           ),
-                          child: const Text('Login',
-                              style: TextStyle(fontSize: 16)),
+                          child: const Text(
+                            'Login',
+                            style: TextStyle(
+                              fontSize: 16, 
+                              fontWeight: FontWeight.bold
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
