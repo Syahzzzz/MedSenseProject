@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:permission_handler/permission_handler.dart'; // Import permission handler
 import 'login.dart';
 import 'signup.dart';
 
@@ -34,8 +35,51 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatelessWidget {
+class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  
+  @override
+  void initState() {
+    super.initState();
+    // Request permissions as soon as the widget initializes
+    _requestFilePermissions();
+  }
+
+  Future<void> _requestFilePermissions() async {
+    // Check status for Storage (General)
+    var storageStatus = await Permission.storage.status;
+    
+    // Check status for Photos/Videos (Android 13+)
+    var photosStatus = await Permission.photos.status;
+
+    if (!storageStatus.isGranted || !photosStatus.isGranted) {
+      // Request multiple permissions at once to ensure coverage across Android versions
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+        // Add Permission.manageExternalStorage if you need full file access (Use with caution)
+      ].request();
+
+      // Optional: Check result and show a snackbar if permanently denied
+      if (statuses[Permission.storage] == PermissionStatus.permanentlyDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Storage permission is required. Please enable it in settings.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          // openAppSettings(); // You can uncomment this to let users open settings directly
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +89,7 @@ class MyHomePage extends StatelessWidget {
       backgroundColor: primaryColor,
       body: Stack(
         children: [
-          // --- Top Header Content (UPDATED STYLE) ---
+          // --- Top Header Content ---
           SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
@@ -143,8 +187,8 @@ class MyHomePage extends StatelessWidget {
                         'You Healthy',
                         style: TextStyle(
                           color: Colors.black,
-                          fontSize: 26, // Slightly larger
-                          fontWeight: FontWeight.w900, // Bolder
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                       const SizedBox(height: 40),
