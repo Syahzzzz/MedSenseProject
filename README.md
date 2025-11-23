@@ -1,6 +1,6 @@
 # MedSenseProject
 
-![MedSense Logo](assets/logo.png) > **Smart Clinic Queue Management System with AI & Accessibility Integration**
+![MedSense Logo](images/logo.png) > **Smart Clinic Queue Management System with AI & Accessibility Integration**
 
 [![Flutter](https://img.shields.io/badge/Built_with-Flutter-blue?style=flat-square&logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Language-Dart-blue?style=flat-square&logo=dart)](https://dart.dev)
