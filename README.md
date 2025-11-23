@@ -24,38 +24,6 @@ By leveraging **Artificial Intelligence**, MedSense predicts waiting times dynam
 ## 🛠️ Tech Stack
 
 * **Frontend:** Flutter (Dart)
-* **Backend:** [Your Backend, e.g., Firebase / Node.js / Laravel]
-* **AI/ML:** [Your AI Tech, e.g., Python / TensorFlow / Scikit-learn for time prediction]
-* **Database:** [Your Database, e.g., Cloud Firestore / PostgreSQL]
-
-## 📸 Screenshots
-
-| Patient Home | Queue View | OKU Mode | Admin Panel |
-|:---:|:---:|:---:|:---:|
-| ![Home](path/to/image1.png) | ![Queue](path/to/image2.png) | ![OKU](path/to/image3.png) | ![Admin](path/to/image4.png) |
-
-## 🚀 Getting Started
-
-Follow these steps to run the project locally.
-
-### Prerequisites
-* Flutter SDK installed ([Guide](https://docs.flutter.dev/get-started/install))
-* [Any other prereq, e.g., Firebase CLI]
-
-### Installation
-
-1.  **Clone the repository**
-    ```bash
-    git clone [https://github.com/yourusername/medsense.git](https://github.com/yourusername/medsense.git)
-    cd medsense
-    ```
-
-2.  **Install dependencies**
-    ```bash
-    flutter pub get
-    ```
-
-3.  **Run the app**
-    ```bash
-    flutter run
-    ```
+* **Backend:** Python - fastAPI
+* **AI/ML:** Scikit-learn and Pandas
+* **Database:** SupaBase
