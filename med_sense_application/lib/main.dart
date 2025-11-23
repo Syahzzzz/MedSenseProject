@@ -9,8 +9,8 @@ Future<void> main() async {
 
   // Initialize Supabase
   await Supabase.initialize(
-    url: 'https://afdhbiquywcoykiltbnf.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZGhiaXF1eXdjb3lraWx0Ym5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzMDk3ODMsImV4cCI6MjA3ODg4NTc4M30.VbTd-yMc7QszVJKtb9HJHtOHxSJyPwWOIvM5BCkfU8Q',
+    url: 'https://toqvutxnatkjxtpttjog.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcXZ1dHhuYXRranh0cHR0am9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0ODg1OTEsImV4cCI6MjA3OTA2NDU5MX0.D8bzPRlqXhPrc28fUFSw5GVPkPMwvRd-iUOECkrQbm0',
   );
 
   runApp(const MyApp());

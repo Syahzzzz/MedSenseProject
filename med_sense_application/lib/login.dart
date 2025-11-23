@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'signup.dart'; // Import Sign Up page
-import 'forgot_password.dart'; // Import Forgot Password page
+import 'package:shared_preferences/shared_preferences.dart'; 
+import 'signup.dart';
+import 'forgot_password.dart';
+import 'onboarding_name.dart';
+import 'dashboard.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,10 +18,43 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   final _supabase = Supabase.instance.client;
   bool _isLoading = false;
+  
+  // --- Remember Me State ---
+  bool _rememberMe = false;
 
-  // Colors from the design
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
+
+  @override
+  void initState() {
+    super.initState();
+    // Check for saved credentials after the widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _attemptAutoLogin();
+    });
+  }
+
+  // --- Auto Login Logic ---
+  Future<void> _attemptAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberStatus = prefs.getBool('remember_me_status') ?? false;
+
+    if (rememberStatus) {
+      final savedEmail = prefs.getString('remember_me_email');
+      final savedPassword = prefs.getString('remember_me_password');
+
+      if (savedEmail != null && savedPassword != null) {
+        setState(() {
+          _emailController.text = savedEmail;
+          _passwordController.text = savedPassword;
+          _rememberMe = true;
+        });
+
+        // Trigger login automatically
+        _handleLogin(); 
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -28,46 +64,67 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
 
     try {
-      await _supabase.auth.signInWithPassword(
+      // --- Save/Remove Credentials based on Remember Me ---
+      final prefs = await SharedPreferences.getInstance();
+      if (_rememberMe) {
+        await prefs.setString('remember_me_email', _emailController.text.trim());
+        // WARNING: Storing passwords in SharedPreferences is not secure for production. 
+        // Use flutter_secure_storage for real apps.
+        await prefs.setString('remember_me_password', _passwordController.text.trim());
+        await prefs.setBool('remember_me_status', true);
+      } else {
+        await prefs.remove('remember_me_email');
+        await prefs.remove('remember_me_password');
+        await prefs.setBool('remember_me_status', false);
+      }
+
+      final AuthResponse response = await _supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login Successful!')),
-        );
-        // Navigate to Dashboard or Home here
-        // Navigator.pushReplacement(context, ...);
+        final user = response.user;
+        final metaData = user?.userMetadata;
+        
+        // Slight delay to show the loading indicator briefly during auto-login
+        // so the user knows what's happening
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          if (metaData == null || metaData['full_name'] == null) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const OnboardingNamePage()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardPage()),
+            );
+          }
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: Colors.redAccent,
-          ),
+          SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unexpected error occurred'),
-            backgroundColor: Colors.redAccent,
-          ),
+          const SnackBar(content: Text('Unexpected error occurred'), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -86,26 +143,21 @@ class _LoginPageState extends State<LoginPage> {
       ),
       body: Column(
         children: [
-          // --- Top Section: Illustration ---
           Expanded(
             flex: 3,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Image.asset(
-                  'images/Doctors-cuate.png',
+                  'images/Login.png',
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.medical_services_outlined,
-                    size: 80,
-                    color: Colors.white,
+                    Icons.medical_services_outlined, size: 80, color: Colors.white
                   ),
                 ),
               ),
             ),
           ),
-
-          // --- Bottom Section: White Card ---
           Expanded(
             flex: 5,
             child: Container(
@@ -118,130 +170,91 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Good to See You Again!',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Let\'s keep that smile healthy and shining',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
+                child: Column(
+                  children: [
+                    const Text('Good to See You Again!',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text('Let\'s keep that smile healthy and shining',
+                        style: TextStyle(color: Colors.grey[600])),
+                    const SizedBox(height: 40),
+                    _buildCustomTextField(_emailController, 'Email', false),
+                    const SizedBox(height: 20),
+                    _buildCustomTextField(_passwordController, 'Password', true),
+                    
+                    const SizedBox(height: 10),
 
-                      // --- Email Input ---
-                      _buildCustomTextField(
-                        controller: _emailController,
-                        hintText: 'Email',
-                        isObscure: false,
-                      ),
-                      const SizedBox(height: 20),
-
-                      // --- Password Input ---
-                      _buildCustomTextField(
-                        controller: _passwordController,
-                        hintText: 'Password',
-                        isObscure: true,
-                      ),
-
-                      // --- Forgot Password Link (UPDATED) ---
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            // Navigate to Forgot Password Page
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
-                            );
-                          },
-                          child: Text(
-                            'Forget password?',
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // --- Login Button ---
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _primaryYellow,
-                            foregroundColor: Colors.white,
-                            elevation: 5,
-                            shadowColor: _primaryYellow.withValues(alpha: 0.5),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Login',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                    // --- Remember Me & Forgot Password Row ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Remember Me Checkbox
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: _rememberMe,
+                                activeColor: _primaryYellow,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      // --- Sign Up Link (UPDATED) ---
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Don\'t have an account? ',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(builder: (context) => const SignupPage()),
-                              );
-                            },
-                            child: const Text(
-                              'Sign Up',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _rememberMe = value ?? false;
+                                  });
+                                },
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Remember me',
+                              style: TextStyle(fontSize: 13, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+
+                        // Forgot Password Link
+                        TextButton(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordPage())),
+                          child: Text('Forget password?', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+                    
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryYellow,
+                          foregroundColor: Colors.white,
+                          elevation: 5,
+                          shadowColor: _primaryYellow.withValues(alpha: 0.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('Login', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 30),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Don\'t have an account? ', style: TextStyle(color: Colors.grey[600])),
+                        GestureDetector(
+                          onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SignupPage())),
+                          child: const Text('Sign Up', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -251,27 +264,16 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildCustomTextField({
-    required TextEditingController controller,
-    required String hintText,
-    required bool isObscure,
-  }) {
+  Widget _buildCustomTextField(TextEditingController controller, String hint, bool obscure) {
     return Container(
-      decoration: BoxDecoration(
-        color: _lightYellowInput,
-        borderRadius: BorderRadius.circular(15),
-      ),
+      decoration: BoxDecoration(color: _lightYellowInput, borderRadius: BorderRadius.circular(15)),
       child: TextField(
         controller: controller,
-        obscureText: isObscure,
+        obscureText: obscure,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 16, color: Colors.black87),
         decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(
-            color: Colors.grey.withValues(alpha: 0.5),
-            fontSize: 18,
-          ),
+          hintText: hint,
+          hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5)),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         ),
