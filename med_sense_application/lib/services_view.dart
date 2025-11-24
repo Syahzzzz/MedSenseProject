@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'translations.dart';
 
 class ServicesView extends StatefulWidget {
   const ServicesView({super.key});
@@ -11,67 +12,67 @@ class _ServicesViewState extends State<ServicesView> {
   // Selected category state
   String _selectedCategory = 'Braces';
 
-  // Categories
+  // Categories (Hardcoded IDs map to translation keys)
   final List<String> _categories = ['Braces', 'Scaling', 'Whitening', 'Retainers'];
 
-  // Mock Data
-  final Map<String, List<Map<String, String>>> _servicesData = {
+  // Mock Data Getter to support live translation
+  Map<String, List<Map<String, String>>> get _servicesData => {
     'Braces': [
       {
-        'title': 'Metal Conventional (Student Jimat Plan)',
-        'duration': 'Est. 24-36 month',
-        'price': 'From RM150/month',
+        'title': AppTranslations.get('metal_student'),
+        'duration': AppTranslations.get('est_24_36'),
+        'price': AppTranslations.get('from_rm150_m'),
       },
       {
-        'title': 'Metal Conventional (with Deposit)',
-        'duration': 'Est. 24-36 month',
-        'price': 'From RM150/month',
+        'title': AppTranslations.get('metal_deposit'),
+        'duration': AppTranslations.get('est_24_36'),
+        'price': AppTranslations.get('from_rm150_m'),
       },
       {
-        'title': 'Metal Conventional (Zero Deposit)',
-        'duration': 'Est. 24-36 month',
-        'price': 'From RM175/month',
+        'title': AppTranslations.get('metal_zero'),
+        'duration': AppTranslations.get('est_24_36'),
+        'price': AppTranslations.get('from_rm175_m'),
       },
       {
-        'title': 'Ceramic Conventional (with Deposit)',
-        'duration': 'Est. 24-36 month',
-        'price': 'From RM175/month',
+        'title': AppTranslations.get('ceramic_deposit'),
+        'duration': AppTranslations.get('est_24_36'),
+        'price': AppTranslations.get('from_rm175_m'),
       },
       {
-        'title': 'Ceramic Conventional (Zero Deposit)',
-        'duration': 'Est. 24-36 month',
-        'price': 'From RM200/month',
+        'title': AppTranslations.get('ceramic_zero'),
+        'duration': AppTranslations.get('est_24_36'),
+        'price': AppTranslations.get('from_rm200_m'),
       },
     ],
     'Scaling': [
       {
-        'title': 'Basic Scaling & Polishing',
-        'duration': 'Est. 30-45 mins',
-        'price': 'From RM100',
+        'title': AppTranslations.get('basic_scaling'),
+        'duration': AppTranslations.get('est_30_45'),
+        'price': AppTranslations.get('from_rm100'),
       },
       {
-        'title': 'Deep Cleaning (Gum Treatment)',
-        'duration': 'Est. 60 mins',
-        'price': 'From RM250',
+        'title': AppTranslations.get('deep_cleaning'),
+        'duration': AppTranslations.get('est_60'),
+        'price': AppTranslations.get('from_rm250'),
       },
     ],
     'Whitening': [
       {
-        'title': 'Home Whitening Kit',
-        'duration': 'Take home kit',
-        'price': 'From RM400',
+        'title': AppTranslations.get('home_whitening'),
+        'duration': AppTranslations.get('take_home_kit'),
+        'price': AppTranslations.get('from_rm400'),
       },
       {
-        'title': 'Zoom Teeth Whitening',
-        'duration': 'Est. 60 mins',
-        'price': 'From RM900',
+        'title': AppTranslations.get('zoom_whitening'),
+        'duration': AppTranslations.get('est_60'),
+        'price': AppTranslations.get('from_rm900'),
       },
     ],
     'Retainers': [
       {
-        'title': 'Clear Retainers (Pair)',
-        'duration': 'Production: 1 week',
-        'price': 'From RM400',
+        'title': AppTranslations.get('clear_retainers'),
+        'duration': AppTranslations.get('production_1_week'),
+        'price': AppTranslations.get('from_rm400'),
       },
     ],
   };
@@ -99,9 +100,9 @@ class _ServicesViewState extends State<ServicesView> {
                     child: const Icon(Icons.reply, size: 32, color: Colors.black54),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    "Services",
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  Text(
+                    AppTranslations.get('services_title'),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -137,7 +138,7 @@ class _ServicesViewState extends State<ServicesView> {
                             : [],
                       ),
                       child: Text(
-                        category,
+                        AppTranslations.get(category),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -216,7 +217,6 @@ class _ServicesViewState extends State<ServicesView> {
                               child: IconButton(
                                 icon: const Icon(Icons.add, size: 20, color: Colors.black),
                                 onPressed: () {
-                                  // Logic to add service or book
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text("Selected: ${service['title']}")),
                                   );
@@ -227,7 +227,6 @@ class _ServicesViewState extends State<ServicesView> {
                           ],
                         ),
                       ),
-                      // Divider Line
                       const Divider(color: Colors.grey, thickness: 0.5),
                     ],
                   );

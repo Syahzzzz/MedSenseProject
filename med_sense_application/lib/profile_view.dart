@@ -6,6 +6,7 @@ import 'main.dart';
 import 'edit_profile_view.dart';
 import 'change_password_view.dart';
 import 'translations.dart';
+import 'language_selector_widget.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -91,32 +92,6 @@ class _ProfileViewState extends State<ProfileView> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showLanguageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(AppTranslations.get('language')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: ['English', 'Bahasa Melayu', 'Mandarin'].map((lang) {
-              return ListTile(
-                title: Text(lang),
-                trailing: appLanguageNotifier.value == lang 
-                    ? const Icon(Icons.check, color: Color(0xFFFBC02D)) 
-                    : null,
-                onTap: () {
-                  appLanguageNotifier.value = lang;
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
-          ),
-        );
-      },
     );
   }
 
@@ -213,16 +188,8 @@ class _ProfileViewState extends State<ProfileView> {
               onChanged: _toggleNotifications,
             ),
 
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                AppTranslations.get('language'),
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(appLanguageNotifier.value),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-              onTap: _showLanguageDialog,
-            ),
+            // REPLACED OLD LANGUAGE TILE WITH NEW WIDGET
+            const LanguageSelectorWidget(),
 
             const SizedBox(height: 40),
 

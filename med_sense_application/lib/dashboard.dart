@@ -23,28 +23,30 @@ class _DashboardPageState extends State<DashboardPage> {
   // --- Data Constants ---
   final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers'];
 
-  final Map<String, List<Map<String, String>>> _servicesData = {
+  // Dynamic getter for services data to support language switching
+  Map<String, List<Map<String, String>>> get _servicesData => {
     'Braces': [
-      {'title': 'Metal Conventional', 'duration': 'Est. 24-36 month', 'price': 'From RM150/month'},
-      {'title': 'Metal Conventional (Deposit)', 'duration': 'Est. 24-36 month', 'price': 'From RM150/month'},
-      {'title': 'Ceramic Conventional', 'duration': 'Est. 24-36 month', 'price': 'From RM175/month'},
+      {'title': AppTranslations.get('metal_student'), 'duration': AppTranslations.get('est_24_36'), 'price': AppTranslations.get('from_rm150_m')},
+      {'title': AppTranslations.get('metal_deposit'), 'duration': AppTranslations.get('est_24_36'), 'price': AppTranslations.get('from_rm150_m')},
+      {'title': AppTranslations.get('ceramic_deposit'), 'duration': AppTranslations.get('est_24_36'), 'price': AppTranslations.get('from_rm175_m')},
     ],
     'Scaling': [
-      {'title': 'Basic Scaling', 'duration': 'Est. 30-45 mins', 'price': 'From RM100'},
-      {'title': 'Deep Cleaning', 'duration': 'Est. 60 mins', 'price': 'From RM250'},
+      {'title': AppTranslations.get('basic_scaling'), 'duration': AppTranslations.get('est_30_45'), 'price': AppTranslations.get('from_rm100')},
+      {'title': AppTranslations.get('deep_cleaning'), 'duration': AppTranslations.get('est_60'), 'price': AppTranslations.get('from_rm250')},
     ],
     'Whitening': [
-      {'title': 'Home Kit', 'duration': 'Take home kit', 'price': 'From RM400'},
-      {'title': 'Zoom Whitening', 'duration': 'Est. 60 mins', 'price': 'From RM900'},
+      {'title': AppTranslations.get('home_whitening'), 'duration': AppTranslations.get('take_home_kit'), 'price': AppTranslations.get('from_rm400')},
+      {'title': AppTranslations.get('zoom_whitening'), 'duration': AppTranslations.get('est_60'), 'price': AppTranslations.get('from_rm900')},
     ],
     'Retainers': [
-      {'title': 'Clear Pair', 'duration': 'Production: 1 week', 'price': 'From RM400'},
+      {'title': AppTranslations.get('clear_retainers'), 'duration': AppTranslations.get('production_1_week'), 'price': AppTranslations.get('from_rm400')},
     ],
   };
 
-  final List<Map<String, String>> _doctors = [
-    {'name': 'Dr. Sarah Smith', 'specialization': 'Dentist - Orthodontist', 'image': 'images/sarah.png'},
-    {'name': 'Dr. John Doe', 'specialization': 'Dentist - Surgeon', 'image': 'images/john.png'},
+  // Dynamic getter for doctors to translate titles if needed
+  List<Map<String, String>> get _doctors => [
+    {'name': 'Dr. Sarah Smith', 'specialization': AppTranslations.get('dentist_ortho'), 'image': 'images/sarah.png'},
+    {'name': 'Dr. John Doe', 'specialization': AppTranslations.get('dentist_surgeon'), 'image': 'images/john.png'},
   ];
 
   // --- Lifecycle ---
@@ -126,7 +128,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (_selectedIndex == 0) return _buildHome();
     if (_selectedIndex == 1) return LocationView(onBack: () => setState(() => _selectedIndex = 0));
     if (_selectedIndex == 3) return const ProfileView();
-    return const Center(child: Text("Coming Soon"));
+    return Center(child: Text(AppTranslations.get('coming_soon')));
   }
 
   // The Main Dashboard Content
@@ -335,7 +337,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // 5. Dynamic Service List (UPDATED: Removed Plus Button, Added Details)
+  // 5. Dynamic Service List (Using getter to fetch translated data)
   Widget _buildServicesList() {
     final currentServices = _servicesData[_selectedServiceCategory] ?? [];
     return Column(

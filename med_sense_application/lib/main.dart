@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:permission_handler/permission_handler.dart'; // Import permission handler
+import 'package:permission_handler/permission_handler.dart';
+import 'translations.dart'; // Import translations
 import 'login.dart';
 import 'signup.dart';
 
@@ -21,16 +22,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MedSense',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFBC02D),
-        ),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(),
+    // Wrap MaterialApp in ValueListenableBuilder to listen for language changes
+    return ValueListenableBuilder<String>(
+      valueListenable: appLanguageNotifier,
+      builder: (context, language, child) {
+        return MaterialApp(
+          // Adding key triggers a full rebuild when language changes
+          key: ValueKey(language), 
+          title: 'MedSense',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFFFBC02D),
+            ),
+            useMaterial3: true,
+          ),
+          home: const MyHomePage(),
+        );
+      },
     );
   }
 }
@@ -117,6 +126,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     const SizedBox(width: 12),
                     // Styled Text
+                    // Note: We use AppTranslations.get here if you want the title translated too, 
+                    // but usually app names stay in English.
                     const Text(
                       'MedSense',
                       style: TextStyle(
@@ -175,19 +186,21 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       
                       const SizedBox(height: 30),
-                      const Text(
-                        'Hey there! Let\'s Keep',
-                        style: TextStyle(
+                      // Using Translation for Slogan
+                      Text(
+                        AppTranslations.get('welcome_title'),
+                        style: const TextStyle(
                           color: Colors.grey,
                           fontSize: 16,
                         ),
                       ),
                       const SizedBox(height: 5),
-                      const Text(
-                        'You Healthy',
-                        style: TextStyle(
+                      Text(
+                        AppTranslations.get('medsense_slogan'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
                           color: Colors.black,
-                          fontSize: 26,
+                          fontSize: 22,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -210,9 +223,9 @@ class _MyHomePageState extends State<MyHomePage> {
                               borderRadius: BorderRadius.circular(30),
                             ),
                           ),
-                          child: const Text(
-                            'Create Account',
-                            style: TextStyle(
+                          child: Text(
+                            AppTranslations.get('create_account'),
+                            style: const TextStyle(
                               fontSize: 16, 
                               color: Colors.black, 
                               fontWeight: FontWeight.w700
@@ -242,9 +255,9 @@ class _MyHomePageState extends State<MyHomePage> {
                               borderRadius: BorderRadius.circular(30),
                             ),
                           ),
-                          child: const Text(
-                            'Login',
-                            style: TextStyle(
+                          child: Text(
+                            AppTranslations.get('login'),
+                            style: const TextStyle(
                               fontSize: 16, 
                               fontWeight: FontWeight.bold
                             ),

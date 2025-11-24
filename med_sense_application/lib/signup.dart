@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart'; // Import for TapGestureRecognizer
+import 'package:flutter/gestures.dart'; 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login.dart';
+import 'translations.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -32,43 +33,32 @@ class _SignupPageState extends State<SignupPage> {
     super.dispose();
   }
 
-  // --- SHOW TERMS & CONDITIONS DIALOG ---
+  // --- SHOW TERMS & CONDITIONS DIALOG (UPDATED FOR TRANSLATIONS) ---
   void _showTermsDialog() {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Terms & Conditions"),
+          title: Text(AppTranslations.get('terms_conditions'), style: const TextStyle(fontWeight: FontWeight.bold)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildTermPoint("1. Acceptance of Terms", 
-                  "By creating an account on MedSense, you agree to comply with and be bound by these Terms and Conditions."),
-                
-                _buildTermPoint("2. Medical Disclaimer", 
-                  "MedSense is an appointment booking platform. We do not provide medical advice, diagnosis, or treatment. In case of a medical emergency, please contact your local emergency services immediately."),
-                
-                _buildTermPoint("3. Appointments & Cancellations", 
-                  "Appointments are subject to doctor availability. Cancellations or rescheduling must be made at least 24 hours in advance to avoid penalties or account suspension."),
-                
-                _buildTermPoint("4. Data Privacy", 
-                  "We value your privacy. Your personal and medical data is stored securely and processed in accordance with the Personal Data Protection Act (PDPA). We do not share your health records without your consent."),
-                
-                _buildTermPoint("5. User Responsibilities", 
-                  "You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account."),
-                
-                _buildTermPoint("6. Payment & Pricing", 
-                  "Prices listed for services (e.g., Braces, Scaling) are estimates. Final pricing is determined by the clinic based on the actual treatment required."),
+                _buildTermPoint("1. ${AppTranslations.get('tc_1_title')}", AppTranslations.get('tc_1_content')),
+                _buildTermPoint("2. ${AppTranslations.get('tc_2_title')}", AppTranslations.get('tc_2_content')),
+                _buildTermPoint("3. ${AppTranslations.get('tc_3_title')}", AppTranslations.get('tc_3_content')),
+                _buildTermPoint("4. ${AppTranslations.get('tc_4_title')}", AppTranslations.get('tc_4_content')),
+                _buildTermPoint("5. ${AppTranslations.get('tc_5_title')}", AppTranslations.get('tc_5_content')),
+                _buildTermPoint("6. ${AppTranslations.get('tc_6_title')}", AppTranslations.get('tc_6_content')),
               ],
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Close", style: TextStyle(color: Colors.black)),
+              child: Text(AppTranslations.get('close'), style: const TextStyle(color: Colors.black)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -78,7 +68,7 @@ class _SignupPageState extends State<SignupPage> {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(backgroundColor: _primaryYellow, foregroundColor: Colors.white),
-              child: const Text("I Agree"),
+              child: Text(AppTranslations.get('i_agree')),
             )
           ],
         );
@@ -193,19 +183,19 @@ class _SignupPageState extends State<SignupPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text(
-                      'Start Your Smile Journey',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                    Text(
+                      AppTranslations.get('start_journey_title'),
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
                     ),
                     const SizedBox(height: 8),
-                    Text('A healthy smile starts with a simple sign up', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                    Text(AppTranslations.get('start_journey_subtitle'), style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                     const SizedBox(height: 30),
 
-                    _buildCustomTextField(_emailController, 'Email', false),
+                    _buildCustomTextField(_emailController, AppTranslations.get('email'), false),
                     const SizedBox(height: 15),
-                    _buildCustomTextField(_phoneController, 'Phone Number', false, keyboardType: TextInputType.phone),
+                    _buildCustomTextField(_phoneController, AppTranslations.get('phone_number'), false, keyboardType: TextInputType.phone),
                     const SizedBox(height: 15),
-                    _buildCustomTextField(_passwordController, 'Password', true),
+                    _buildCustomTextField(_passwordController, AppTranslations.get('password'), true),
                     
                     const SizedBox(height: 20),
 
@@ -215,20 +205,19 @@ class _SignupPageState extends State<SignupPage> {
                       onChanged: (val) => setState(() => _agreeToTerms = val ?? false),
                       labelWidget: RichText(
                         text: TextSpan(
-                          text: 'I agree to the ',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[800], fontFamily: 'Arial'), // Default text style
+                          text: AppTranslations.get('agree_to'),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[800], fontFamily: 'Arial'), 
                           children: [
                             TextSpan(
-                              text: 'Terms & Conditions',
+                              text: AppTranslations.get('terms_conditions'),
                               style: const TextStyle(
                                 color: Colors.blue, 
                                 fontWeight: FontWeight.bold,
                                 decoration: TextDecoration.underline,
                               ),
-                              // Make it clickable
                               recognizer: TapGestureRecognizer()..onTap = _showTermsDialog,
                             ),
-                            const TextSpan(text: ' and Privacy Policy'),
+                            TextSpan(text: AppTranslations.get('and_privacy')),
                           ],
                         ),
                       ),
@@ -239,7 +228,7 @@ class _SignupPageState extends State<SignupPage> {
                       value: _isOku,
                       onChanged: (val) => setState(() => _isOku = val ?? false),
                       labelWidget: Text(
-                        'I am a person with disability (OKU). Enable accessibility features',
+                        AppTranslations.get('oku_checkbox'),
                         style: TextStyle(fontSize: 12, color: Colors.grey[800], height: 1.2),
                       ),
                     ),
@@ -260,7 +249,7 @@ class _SignupPageState extends State<SignupPage> {
                         ),
                         child: _isLoading
                             ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('Sign Up', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            : Text(AppTranslations.get('signup'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                     ),
 
@@ -269,12 +258,12 @@ class _SignupPageState extends State<SignupPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Already have an account? ', style: TextStyle(color: Colors.grey[600])),
+                        Text(AppTranslations.get('already_have_account'), style: TextStyle(color: Colors.grey[600])),
                         GestureDetector(
                           onTap: () {
                             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginPage()));
                           },
-                          child: const Text('Log In', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                          child: Text(AppTranslations.get('login'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -308,7 +297,6 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
-  // Updated to accept a generic Widget for the label
   Widget _buildCheckboxRow({
     required bool value,
     required ValueChanged<bool?> onChanged,
@@ -331,7 +319,7 @@ class _SignupPageState extends State<SignupPage> {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: labelWidget, // Use the widget passed in
+            child: labelWidget, 
           ),
         ],
       ),

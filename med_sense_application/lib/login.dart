@@ -5,6 +5,7 @@ import 'signup.dart';
 import 'forgot_password.dart';
 import 'onboarding_name.dart';
 import 'dashboard.dart';
+import 'translations.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -73,8 +74,6 @@ class _LoginPageState extends State<LoginPage> {
       final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
         await prefs.setString('remember_me_email', _emailController.text.trim());
-        // WARNING: Storing passwords in SharedPreferences is not secure for production. 
-        // Use flutter_secure_storage for real apps.
         await prefs.setString('remember_me_password', _passwordController.text.trim());
         await prefs.setBool('remember_me_status', true);
       } else {
@@ -92,8 +91,6 @@ class _LoginPageState extends State<LoginPage> {
         final user = response.user;
         final metaData = user?.userMetadata;
         
-        // Slight delay to show the loading indicator briefly during auto-login
-        // so the user knows what's happening
         await Future.delayed(const Duration(milliseconds: 500));
         
         if (mounted) {
@@ -173,15 +170,17 @@ class _LoginPageState extends State<LoginPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
                 child: Column(
                   children: [
-                    const Text('Good to See You Again!',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text(AppTranslations.get('welcome_title'),
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    Text('Let\'s keep that smile healthy and shining',
+                    Text(AppTranslations.get('welcome_subtitle'),
+                        textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey[600])),
                     const SizedBox(height: 40),
-                    _buildCustomTextField(_emailController, 'Email', false),
+                    
+                    _buildCustomTextField(_emailController, AppTranslations.get('email'), false),
                     const SizedBox(height: 20),
-                    _buildCustomTextField(_passwordController, 'Password', true),
+                    _buildCustomTextField(_passwordController, AppTranslations.get('password'), true),
                     
                     const SizedBox(height: 10),
 
@@ -209,9 +208,9 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Remember me',
-                              style: TextStyle(fontSize: 13, color: Colors.grey),
+                            Text(
+                              AppTranslations.get('remember_me'),
+                              style: const TextStyle(fontSize: 13, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -219,7 +218,7 @@ class _LoginPageState extends State<LoginPage> {
                         // Forgot Password Link
                         TextButton(
                           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordPage())),
-                          child: Text('Forget password?', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                          child: Text(AppTranslations.get('forgot_pass'), style: TextStyle(color: Colors.grey[700], fontSize: 12)),
                         ),
                       ],
                     ),
@@ -240,17 +239,17 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         child: _isLoading
                             ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('Login', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            : Text(AppTranslations.get('login'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                     ),
                     const SizedBox(height: 30),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Don\'t have an account? ', style: TextStyle(color: Colors.grey[600])),
+                        Text(AppTranslations.get('no_account'), style: TextStyle(color: Colors.grey[600])),
                         GestureDetector(
                           onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SignupPage())),
-                          child: const Text('Sign Up', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: Text(AppTranslations.get('signup'), style: const TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),

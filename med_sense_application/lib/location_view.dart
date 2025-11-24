@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'translations.dart';
 
 class LocationView extends StatelessWidget {
   final VoidCallback onBack;
@@ -7,31 +8,31 @@ class LocationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mock Data for locations with IMAGE PATHS
+    // Dynamic Data with Translations
     final List<Map<String, dynamic>> clinics = [
       {
-        'name': 'Dental Clinic Rawang',
+        'name': AppTranslations.get('dental_clinic_rawang'),
         'address': 'Reef 2, Rawang',
         'rating': 4.9,
         'reviews': 967,
         'closing_time': '10:00 pm',
-        'image': 'images/clinic_rawang.png', // Ensure this file exists
+        'image': 'images/clinic_rawang.png', 
       },
       {
-        'name': 'Dental Clinic Selayang',
+        'name': AppTranslations.get('dental_clinic_selayang'),
         'address': 'Emerald Avenue, Selayang',
         'rating': 4.8,
         'reviews': 520,
         'closing_time': '9:30 pm',
-        'image': 'images/clinic_selayang.png', // Ensure this file exists
+        'image': 'images/clinic_selayang.png', 
       },
       {
-        'name': 'Dental Clinic KL Sentral',
+        'name': AppTranslations.get('dental_clinic_kl'),
         'address': 'Nu Sentral, KL',
         'rating': 5.0,
         'reviews': 1200,
         'closing_time': '11:00 pm',
-        'image': 'images/clinic_kl.png', // Ensure this file exists
+        'image': 'images/clinic_kl.png', 
       },
     ];
 
@@ -50,20 +51,20 @@ class LocationView extends StatelessWidget {
             const SizedBox(height: 30),
 
             // --- Header ---
-            const Text(
-              "Choose a location",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Text(
+              AppTranslations.get('choose_location'),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             
             const SizedBox(height: 20),
 
             // --- Subheader ---
-            const Text(
-              "Dental Clinic",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Text(
+              AppTranslations.get('dental_clinic_sub'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
-              "${clinics.length} locations",
+              "${clinics.length} ${AppTranslations.get('locations_count_suffix')}",
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
 
@@ -110,7 +111,7 @@ class LocationView extends StatelessWidget {
                                       const Icon(Icons.image_not_supported, color: Colors.grey, size: 40),
                                       const SizedBox(height: 8),
                                       Text(
-                                        "Image not found",
+                                        AppTranslations.get('image_not_found'),
                                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                                       ),
                                     ],
@@ -132,9 +133,9 @@ class LocationView extends StatelessWidget {
                         // Rating
                         Row(
                           children: [
-                            const Text(
-                              "4.9 ",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            Text(
+                              "${clinic['rating']} ",
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                             const Icon(Icons.star, size: 14, color: Colors.black),
                             const Icon(Icons.star, size: 14, color: Colors.black),
@@ -161,12 +162,12 @@ class LocationView extends StatelessWidget {
                           text: TextSpan(
                             style: const TextStyle(fontSize: 13, color: Colors.black),
                             children: [
-                              const TextSpan(
-                                text: "Open ",
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                              TextSpan(
+                                text: AppTranslations.get('open'),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               TextSpan(
-                                text: "until ${clinic['closing_time']}",
+                                text: "${AppTranslations.get('until')} ${clinic['closing_time']}",
                                 style: TextStyle(color: Colors.grey[600]),
                               ),
                             ],
