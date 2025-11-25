@@ -1,6 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart'; 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/gestures.dart';
+import 'package:http/http.dart' as http;
 import 'login.dart';
 import 'translations.dart';
 
@@ -12,20 +13,29 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
-  // Controllers
+  // Update this URL based on where your FastAPI is running
+  // Android Emulator: 'http://10.0.2.2:8000/signup'
+  // iOS Simulator: 'http://127.0.0.1:8000/signup'
+  // Real Device: 'http://YOUR_LOCAL_IP:8000/signup'
+  final String _apiUrl = 'http://10.22.67.29:8000/signup';
+
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _dobController = TextEditingController(); // For Date of Birth display
+  final _dobController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
-  final _supabase = Supabase.instance.client;
+
+  // Removed Supabase instance as we now use API
   bool _isLoading = false;
-  
+
   bool _agreeToTerms = false;
   bool _isOku = false;
-  DateTime? _selectedDate; // To store the actual Date object
+  DateTime? _selectedDate;
+
+  // Visibility State
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
@@ -41,11 +51,10 @@ class _SignupPageState extends State<SignupPage> {
     super.dispose();
   }
 
-  // --- DATE PICKER LOGIC ---
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(2000), // Default to year 2000
+      initialDate: DateTime(2000),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
       builder: (context, child) {
@@ -64,13 +73,11 @@ class _SignupPageState extends State<SignupPage> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        // Format date as YYYY-MM-DD for display/storage
         _dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }
 
-  // --- SHOW TERMS & CONDITIONS DIALOG ---
   void _showTermsDialog() {
     showDialog(
       context: context,
@@ -127,8 +134,9 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
+  // Removed _hashPassword as logic is now in Python backend
+
   Future<void> _handleSignup() async {
-    // --- VALIDATION ---
     if (_fullNameController.text.trim().isEmpty) {
       _showError("Please enter your full name");
       return;
@@ -153,31 +161,42 @@ class _SignupPageState extends State<SignupPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Sign up with Supabase
-      await _supabase.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        data: {
-          'full_name': _fullNameController.text.trim(),
-          'phone_number': _phoneController.text.trim(),
-          'dob': _dobController.text.trim(), // Save DOB to metadata
-          'is_oku': _isOku,
-        },
+      // Prepare data for FastAPI
+      final Map<String, dynamic> requestBody = {
+        'full_name': _fullNameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'dob': _dobController.text.trim(),
+        'password': _passwordController.text.trim(),
+        'is_oku': _isOku,
+      };
+
+      // Call Python Backend
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Success! Please check your email to confirm.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context); 
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Success! Account created.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        // Handle API errors
+        String errorMsg = responseData['detail'] ?? 'Registration failed';
+        if (mounted) _showError(errorMsg);
       }
-    } on AuthException catch (e) {
-      if (mounted) _showError(e.message);
     } catch (e) {
-      if (mounted) _showError('Unexpected error occurred');
+      if (mounted) _showError('Network error: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -205,7 +224,6 @@ class _SignupPageState extends State<SignupPage> {
       ),
       body: Column(
         children: [
-          // --- Top Section: Illustration ---
           Expanded(
             flex: 2,
             child: Center(
@@ -221,8 +239,7 @@ class _SignupPageState extends State<SignupPage> {
               ),
             ),
           ),
-          
-          // --- Bottom Section: Form ---
+
           Expanded(
             flex: 6,
             child: Container(
@@ -247,25 +264,21 @@ class _SignupPageState extends State<SignupPage> {
                     Text(AppTranslations.get('start_journey_subtitle'), style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                     const SizedBox(height: 30),
 
-                    // 1. Full Name
-                    _buildCustomTextField(_fullNameController, AppTranslations.get('full_name'), false),
+                    _buildCustomTextField(_fullNameController, AppTranslations.get('Full name'), false),
                     const SizedBox(height: 15),
 
-                    // 2. Email
                     _buildCustomTextField(_emailController, AppTranslations.get('email'), false),
                     const SizedBox(height: 15),
 
-                    // 3. Phone Number
                     _buildCustomTextField(_phoneController, AppTranslations.get('phone_number'), false, keyboardType: TextInputType.phone),
                     const SizedBox(height: 15),
 
-                    // 4. Date of Birth (Clickable Field)
                     GestureDetector(
                       onTap: () => _selectDate(context),
-                      child: AbsorbPointer( // Prevents keyboard from opening
+                      child: AbsorbPointer(
                         child: _buildCustomTextField(
-                          _dobController, 
-                          AppTranslations.get('select_birthday'), // Ensure this key exists or use "Date of Birth"
+                          _dobController,
+                          AppTranslations.get('select_birthday'),
                           false,
                           icon: Icons.calendar_today_outlined
                         ),
@@ -273,28 +286,39 @@ class _SignupPageState extends State<SignupPage> {
                     ),
                     const SizedBox(height: 15),
 
-                    // 5. Password
-                    _buildCustomTextField(_passwordController, AppTranslations.get('password'), true),
+                    // Password
+                    _buildCustomTextField(
+                      _passwordController,
+                      AppTranslations.get('password'),
+                      _obscurePassword,
+                      isPassword: true,
+                      onEyePressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                     const SizedBox(height: 15),
 
-                    // 6. Confirm Password
-                    _buildCustomTextField(_confirmPasswordController, AppTranslations.get('confirm_pass'), true),
-                    
+                    // Confirm Password
+                    _buildCustomTextField(
+                      _confirmPasswordController,
+                      AppTranslations.get('confirm_pass'),
+                      _obscureConfirmPassword,
+                      isPassword: true,
+                      onEyePressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    ),
+
                     const SizedBox(height: 20),
 
-                    // --- CHECKBOX 1: Terms & Conditions (With Hyperlink) ---
                     _buildCheckboxRow(
                       value: _agreeToTerms,
                       onChanged: (val) => setState(() => _agreeToTerms = val ?? false),
                       labelWidget: RichText(
                         text: TextSpan(
                           text: AppTranslations.get('agree_to'),
-                          style: TextStyle(fontSize: 12, color: Colors.grey[800], fontFamily: 'Arial'), 
+                          style: TextStyle(fontSize: 12, color: Colors.grey[800], fontFamily: 'Arial'),
                           children: [
                             TextSpan(
                               text: AppTranslations.get('terms_conditions'),
                               style: const TextStyle(
-                                color: Colors.blue, 
+                                color: Colors.blue,
                                 fontWeight: FontWeight.bold,
                                 decoration: TextDecoration.underline,
                               ),
@@ -306,7 +330,6 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                     ),
 
-                    // --- CHECKBOX 2: Disability (OKU) ---
                     _buildCheckboxRow(
                       value: _isOku,
                       onChanged: (val) => setState(() => _isOku = val ?? false),
@@ -361,7 +384,17 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
-  Widget _buildCustomTextField(TextEditingController controller, String hint, bool obscure, {TextInputType? keyboardType, IconData? icon}) {
+  Widget _buildCustomTextField(
+    TextEditingController controller,
+    String hint,
+    bool obscure,
+    {
+      TextInputType? keyboardType,
+      IconData? icon,
+      bool isPassword = false,
+      VoidCallback? onEyePressed
+    }
+  ) {
     return Container(
       decoration: BoxDecoration(color: _lightYellowInput, borderRadius: BorderRadius.circular(15)),
       child: TextField(
@@ -375,8 +408,15 @@ class _SignupPageState extends State<SignupPage> {
           hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5), fontSize: 16),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          // Optional icon (used for Date of Birth)
-          suffixIcon: icon != null ? Icon(icon, color: Colors.grey) : null,
+          suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscure ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
+                ),
+                onPressed: onEyePressed,
+              )
+            : (icon != null ? Icon(icon, color: Colors.grey) : null),
         ),
       ),
     );
@@ -404,7 +444,7 @@ class _SignupPageState extends State<SignupPage> {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: labelWidget, 
+            child: labelWidget,
           ),
         ],
       ),

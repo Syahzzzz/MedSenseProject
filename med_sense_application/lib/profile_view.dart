@@ -21,7 +21,7 @@ class _ProfileViewState extends State<ProfileView> {
   String _userName = "User";
   String _email = "";
   String? _avatarUrl;
-  String _patientId = "452727482"; 
+  String _patientId = "--------"; 
   bool _notificationsEnabled = false;
 
   // --- Lifecycle ---
@@ -34,25 +34,56 @@ class _ProfileViewState extends State<ProfileView> {
 
   // --- Data Loading ---
   Future<void> _loadUserProfile() async {
+    // 1. Refresh Session (Optional but good practice)
     try {
         await _supabase.auth.refreshSession();
     } catch (_) {}
 
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      if (mounted) {
-        setState(() {
-          _email = user.email ?? "";
-          _userName = user.userMetadata?['full_name'] ?? "User";
-          String? url = user.userMetadata?['avatar_url'];
-          if (url != null) {
-             _avatarUrl = "$url?t=${DateTime.now().millisecondsSinceEpoch}";
-          }
-          
-          if (user.userMetadata?['patient_id'] != null) {
-            _patientId = user.userMetadata!['patient_id'].toString();
-          }
-        });
+      try {
+        // 2. Query the Public 'Patient' Table
+        // We link auth.users.id to public.Patient.patient_id
+        final data = await _supabase
+            .from('Patient')
+            .select()
+            .eq('patient_id', user.id)
+            .maybeSingle();
+
+        if (mounted) {
+          setState(() {
+            // Email is strictly from Auth for security
+            _email = user.email ?? "";
+            
+            // Avatar is stored in Metadata (as per your edit logic)
+            String? url = user.userMetadata?['avatar_url'];
+            if (url != null) {
+               _avatarUrl = "$url?t=${DateTime.now().millisecondsSinceEpoch}";
+            }
+
+            if (data != null) {
+              // Source of Truth: Database Table
+              _userName = data['name'] ?? "User";
+              
+              // Get ID from DB. Since it's a UUID, we format it to be readable.
+              String rawId = data['patient_id'].toString();
+              if (rawId.length >= 8) {
+                _patientId = rawId.substring(0, 8).toUpperCase();
+              } else {
+                _patientId = rawId;
+              }
+            } else {
+              // Fallback: Metadata (if DB record missing)
+              _userName = user.userMetadata?['full_name'] ?? "User";
+              // Fallback ID from Auth User ID
+              if (user.id.length >= 8) {
+                _patientId = user.id.substring(0, 8).toUpperCase();
+              }
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint("Error loading profile from DB: $e");
       }
     }
   }
@@ -220,7 +251,6 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                   const SizedBox(height: 15),
                   
-                  // UPDATED: Added textAlign: TextAlign.center here
                   Text(
                     _userName,
                     textAlign: TextAlign.center,

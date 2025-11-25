@@ -41,16 +41,45 @@ class _EditProfileViewState extends State<EditProfileView> {
     super.dispose();
   }
 
-  void _loadCurrentData() {
+  Future<void> _loadCurrentData() async {
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      setState(() {
-        _nameController.text = user.userMetadata?['full_name'] ?? "";
-        _emailController.text = user.email ?? "";
-        _phoneController.text = user.userMetadata?['phone_number'] ?? "";
-        _dobController.text = user.userMetadata?['dob'] ?? "";
-        _currentAvatarUrl = user.userMetadata?['avatar_url'];
-      });
+      setState(() => _isLoading = true);
+      try {
+        // Try to fetch from Patient table first
+        final data = await _supabase
+            .from('Patient')
+            .select()
+            .eq('patient_id', user.id)
+            .maybeSingle();
+
+        if (data != null) {
+          setState(() {
+            _nameController.text = data['name'] ?? "";
+            _emailController.text = data['email'] ?? "";
+            _phoneController.text = data['phone_number'] ?? "";
+            _dobController.text = data['dob'] ?? "";
+            // Note: Patient table schema provided didn't show avatar_url, 
+            // so we still try to fetch it from auth metadata if stored there, 
+            // or you can add an avatar_url column to Patient table.
+            // For now, we keep using metadata for avatar to avoid breaking existing logic unless you add the column.
+            _currentAvatarUrl = user.userMetadata?['avatar_url']; 
+          });
+        } else {
+          // Fallback to metadata if no DB record found (migration/legacy support)
+          setState(() {
+            _nameController.text = user.userMetadata?['full_name'] ?? "";
+            _emailController.text = user.email ?? "";
+            _phoneController.text = user.userMetadata?['phone_number'] ?? "";
+            _dobController.text = user.userMetadata?['dob'] ?? "";
+            _currentAvatarUrl = user.userMetadata?['avatar_url'];
+          });
+        }
+      } catch (e) {
+        debugPrint("Error loading profile: $e");
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -87,7 +116,7 @@ class _EditProfileViewState extends State<EditProfileView> {
         source: ImageSource.gallery,
         maxWidth: 600, 
         maxHeight: 600,
-        imageQuality: 80, // Compress slightly
+        imageQuality: 80,
       );
 
       if (pickedFile != null) {
@@ -111,30 +140,15 @@ class _EditProfileViewState extends State<EditProfileView> {
       final fileExt = _imageFile!.path.split('.').last;
       final fileName = '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       
-      // 1. Upload to Supabase Storage
-      // NOTE: Ensure you have a bucket named 'avatars' and it is set to Public
       await _supabase.storage.from('avatars').upload(
         fileName,
         _imageFile!,
         fileOptions: const FileOptions(upsert: true),
       );
 
-      // 2. Get the public URL
       final imageUrl = _supabase.storage.from('avatars').getPublicUrl(fileName);
       return imageUrl;
-    } on StorageException catch (e) {
-      // Specific Storage Error
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Storage Error: ${e.message} (Check Bucket Policies)'), 
-            backgroundColor: Colors.red
-          ),
-        );
-      }
-      return null;
     } catch (e) {
-      // General Error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Upload Failed: $e'), backgroundColor: Colors.red),
@@ -152,32 +166,40 @@ class _EditProfileViewState extends State<EditProfileView> {
 
       String? newAvatarUrl = _currentAvatarUrl;
 
-      // 1. Attempt Upload
+      // 1. Attempt Image Upload
       if (_imageFile != null) {
         final url = await _uploadImage(user.id);
         if (url == null && mounted) {
-          // If url is null but we had a file, upload failed. Stop here.
           setState(() => _isLoading = false);
           return; 
         }
         newAvatarUrl = url;
       }
 
-      // 2. Update Metadata
-      final String currentEmail = user.email ?? '';
       final String newEmail = _emailController.text.trim();
-      
+      final String name = _nameController.text.trim();
+      final String phone = _phoneController.text.trim();
+      final String dob = _dobController.text.trim();
+
+      // 2. Update Auth Metadata (Keeps auth session in sync)
       final userAttributes = UserAttributes(
-        email: (newEmail.isNotEmpty && newEmail != currentEmail) ? newEmail : null,
+        email: (newEmail.isNotEmpty && newEmail != user.email) ? newEmail : null,
         data: {
-          'full_name': _nameController.text.trim(),
-          'phone_number': _phoneController.text.trim(),
-          'dob': _dobController.text.trim(),
+          'full_name': name,
+          'phone_number': phone,
+          'dob': dob,
           'avatar_url': newAvatarUrl,
         },
       );
-      
       await _supabase.auth.updateUser(userAttributes);
+
+      // 3. Update Public Patient Table
+      await _supabase.from('Patient').update({
+        'name': name,
+        'phone_number': phone,
+        'dob': dob,
+        'email': newEmail, // Warning: Changing email here without verifying might cause issues if you use email for uniqueness
+      }).eq('patient_id', user.id);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -189,6 +211,12 @@ class _EditProfileViewState extends State<EditProfileView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Auth Error: ${e.message}'), backgroundColor: Colors.red),
+        );
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Database Error: ${e.message}'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -231,7 +259,6 @@ class _EditProfileViewState extends State<EditProfileView> {
                       child: CircleAvatar(
                         radius: 50,
                         backgroundColor: Colors.grey[200],
-                        // Priority: Local File -> Network URL -> Default Icon
                         backgroundImage: _imageFile != null
                             ? FileImage(_imageFile!)
                             : (_currentAvatarUrl != null && _currentAvatarUrl!.isNotEmpty)

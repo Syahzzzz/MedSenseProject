@@ -1,115 +1,87 @@
 import os
-import uuid
-from fastapi import FastAPI, HTTPException, status
+import hashlib
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from supabase import create_client, Client
-from dotenv import load_dotenv
-from ..schemas import PatientCreate, PatientUpdate, PatientResponse, PasswordUpdate
-from ..security import get_password_hash
 
-# 1. Load Environment Variables
-load_dotenv()
-url: str = os.environ.get("https://toqvutxnatkjxtpttjog.supabase.co")
-key: str = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcXZ1dHhuYXRranh0cHR0am9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0ODg1OTEsImV4cCI6MjA3OTA2NDU5MX0.D8bzPRlqXhPrc28fUFSw5GVPkPMwvRd-iUOECkrQbm0")
+# --- Configuration ---
+# Replace these with your actual Supabase credentials
+SUPABASE_URL = "https://toqvutxnatkjxtpttjog.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcXZ1dHhuYXRranh0cHR0am9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0ODg1OTEsImV4cCI6MjA3OTA2NDU5MX0.D8bzPRlqXhPrc28fUFSw5GVPkPMwvRd-iUOECkrQbm0"
 
-# 2. Initialize Supabase Client
-supabase: Client = create_client(url, key)
+app = FastAPI()
 
-# 3. Initialize FastAPI
-app = FastAPI(title="MedSense Patient Backend")
+# Initialize Supabase Client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- ENDPOINTS ---
+# --- Pydantic Models (Data Transfer Objects) ---
+class SignupRequest(BaseModel):
+    full_name: str
+    email: str
+    phone: str
+    dob: str
+    password: str
+    is_oku: bool
 
-@app.post("/patients/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
-def create_patient(patient: PatientCreate):
-    """
-    Insert a new patient into the database.
-    Hashes the password before storing.
-    """
-    # 1. Hash the password
-    hashed_pw = get_password_hash(patient.password)
+# --- Helper Functions ---
+def hash_password(password: str) -> str:
+    """Replicates the SHA256 hashing from the original Dart code"""
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-    # 2. Prepare data for Supabase
-    patient_data = {
-        "name": patient.name,
-        "email": patient.email,
-        "password_hash": hashed_pw,
-        "dob": patient.dob.isoformat() if patient.dob else None,
-        "phone_number": patient.phone_number,
-        "is_oku": patient.is_oku
-    }
-
+# --- Endpoints ---
+@app.post("/signup")
+async def signup_user(user: SignupRequest):
     try:
-        # 3. Insert into 'Patient' table
-        response = supabase.table("Patient").insert(patient_data).execute()
-        
-        # Check if data was returned
-        if not response.data:
-            raise HTTPException(status_code=400, detail="Failed to create patient.")
-            
-        return response.data[0]
+        # 1. Sign up with Supabase Auth
+        # Note: We pass metadata so it lives in auth.users as well
+        auth_response = supabase.auth.sign_up({
+            "email": user.email,
+            "password": user.password,
+            "options": {
+                "data": {
+                    "full_name": user.full_name,
+                    "phone_number": user.phone,
+                    "dob": user.dob,
+                    "is_oku": user.is_oku
+                }
+            }
+        })
+
+        if not auth_response.user:
+            raise HTTPException(status_code=400, detail="Signup failed: No user returned")
+
+        user_id = auth_response.user.id
+
+        # 2. Insert into custom Patient Table
+        # We handle the hashing here on the backend now
+        patient_data = {
+            "patient_id": user_id,
+            "name": user.full_name,
+            "email": user.email,
+            "password_hash": hash_password(user.password),
+            "dob": user.dob,
+            "phone_number": user.phone,
+            "is_oku": user.is_oku
+        }
+
+        db_response = supabase.table("Patient").insert(patient_data).execute()
+
+        return {
+            "status": "success", 
+            "message": "Account created successfully",
+            "user_id": user_id
+        }
 
     except Exception as e:
-        # Handle duplicate email or connection errors
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/patients/{patient_id}", response_model=PatientResponse)
-def get_patient(patient_id: uuid.UUID):
-    """
-    Retrieve a patient's profile information by ID.
-    """
-    response = supabase.table("Patient").select("*").eq("patient_id", str(patient_id)).execute()
-    
-    if not response.data:
-        raise HTTPException(status_code=404, detail="Patient not found")
-    
-    return response.data[0]
-
-
-@app.put("/patients/{patient_id}", response_model=PatientResponse)
-def update_patient_info(patient_id: uuid.UUID, patient_update: PatientUpdate):
-    """
-    Edit personal information (Name, DOB, Phone, Is_OKU).
-    Ignores fields that are not sent.
-    """
-    # Filter out None values so we only update what was sent
-    update_data = {k: v for k, v in patient_update.dict(exclude_unset=True).items() if v is not None}
-    
-    if "dob" in update_data:
-        update_data["dob"] = update_data["dob"].isoformat()
-
-    if not update_data:
-        raise HTTPException(status_code=400, detail="No valid fields provided for update")
-
-    try:
-        response = supabase.table("Patient").update(update_data).eq("patient_id", str(patient_id)).execute()
-        
-        if not response.data:
-            raise HTTPException(status_code=404, detail="Patient not found or update failed")
+        # Check if it's a Supabase/API error and forward the message
+        error_msg = str(e)
+        if hasattr(e, 'message'):
+            error_msg = e.message
+        elif hasattr(e, 'detail'):
+            error_msg = e.detail
             
-        return response.data[0]
+        raise HTTPException(status_code=400, detail=error_msg)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.put("/patients/{patient_id}/password", status_code=status.HTTP_200_OK)
-def update_password(patient_id: uuid.UUID, password_data: PasswordUpdate):
-    """
-    Specific endpoint to update ONLY the password.
-    Hashes the new password before saving.
-    """
-    new_hash = get_password_hash(password_data.new_password)
-    
-    try:
-        response = supabase.table("Patient").update(
-            {"password_hash": new_hash}
-        ).eq("patient_id", str(patient_id)).execute()
-
-        if not response.data:
-            raise HTTPException(status_code=404, detail="Patient not found")
-            
-        return {"message": "Password updated successfully"}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

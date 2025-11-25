@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,8 +18,19 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = false;
 
+  // Visibility States
+  bool _obscureCurrentPass = true;
+  bool _obscureNewPass = true;
+  bool _obscureConfirmPass = true;
+
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
+
+  String _hashPassword(String password) {
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+    return digest.toString();
+  }
 
   Future<void> _changePassword() async {
     if (_newPassController.text != _confirmPassController.text) {
@@ -40,16 +53,20 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
       final user = _supabase.auth.currentUser;
       if (user == null || user.email == null) throw "User not logged in";
 
-      // 1. Re-authenticate to verify Current Password
       await _supabase.auth.signInWithPassword(
         email: user.email!,
         password: _currentPassController.text.trim(),
       );
 
-      // 2. If successful, update to New Password
+      final newPassword = _newPassController.text.trim();
+
       await _supabase.auth.updateUser(
-        UserAttributes(password: _newPassController.text.trim()),
+        UserAttributes(password: newPassword),
       );
+
+      await _supabase.from('Patient').update({
+        'password_hash': _hashPassword(newPassword),
+      }).eq('patient_id', user.id);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -91,19 +108,34 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
           children: [
             const Text("Current Password", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildPasswordField(_currentPassController, "Enter current password"),
+            _buildPasswordField(
+              _currentPassController, 
+              "Enter current password",
+              _obscureCurrentPass,
+              () => setState(() => _obscureCurrentPass = !_obscureCurrentPass),
+            ),
 
             const SizedBox(height: 20),
 
             const Text("New Password", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildPasswordField(_newPassController, "Enter new password"),
+            _buildPasswordField(
+              _newPassController, 
+              "Enter new password",
+              _obscureNewPass,
+              () => setState(() => _obscureNewPass = !_obscureNewPass),
+            ),
 
             const SizedBox(height: 20),
 
             const Text("Confirm New Password", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildPasswordField(_confirmPassController, "Re-enter new password"),
+            _buildPasswordField(
+              _confirmPassController, 
+              "Re-enter new password",
+              _obscureConfirmPass,
+              () => setState(() => _obscureConfirmPass = !_obscureConfirmPass),
+            ),
 
             const SizedBox(height: 40),
 
@@ -128,7 +160,7 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
     );
   }
 
-  Widget _buildPasswordField(TextEditingController controller, String hint) {
+  Widget _buildPasswordField(TextEditingController controller, String hint, bool obscure, VoidCallback onToggle) {
     return Container(
       decoration: BoxDecoration(
         color: _lightYellowInput,
@@ -136,11 +168,18 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
       ),
       child: TextField(
         controller: controller,
-        obscureText: true,
+        obscureText: obscure,
         decoration: InputDecoration(
           hintText: hint,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscure ? Icons.visibility_off : Icons.visibility,
+              color: Colors.grey,
+            ),
+            onPressed: onToggle,
+          ),
         ),
       ),
     );

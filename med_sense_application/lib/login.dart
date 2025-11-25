@@ -20,8 +20,9 @@ class _LoginPageState extends State<LoginPage> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = false;
   
-  // --- Remember Me State ---
+  // --- State Variables ---
   bool _rememberMe = false;
+  bool _obscurePassword = true; // Controls the eye icon
 
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
@@ -29,14 +30,13 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    // Check for saved credentials after the widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _attemptAutoLogin();
+      _loadSavedCredentials();
     });
   }
 
-  // --- Auto Login Logic ---
-  Future<void> _attemptAutoLogin() async {
+  // --- Load Credentials (Don't Auto Login) ---
+  Future<void> _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     final rememberStatus = prefs.getBool('remember_me_status') ?? false;
 
@@ -50,9 +50,7 @@ class _LoginPageState extends State<LoginPage> {
           _passwordController.text = savedPassword;
           _rememberMe = true;
         });
-
-        // Trigger login automatically
-        _handleLogin(); 
+        // Removed _handleLogin() here so you can verify credentials first
       }
     }
   }
@@ -65,12 +63,19 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter email and password')),
+        );
+        return;
+    }
+
     if (mounted) {
       setState(() => _isLoading = true);
     }
 
     try {
-      // --- Save/Remove Credentials based on Remember Me ---
+      // --- Save/Remove Credentials ---
       final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
         await prefs.setString('remember_me_email', _emailController.text.trim());
@@ -91,8 +96,6 @@ class _LoginPageState extends State<LoginPage> {
         final user = response.user;
         final metaData = user?.userMetadata;
         
-        await Future.delayed(const Duration(milliseconds: 500));
-        
         if (mounted) {
           if (metaData == null || metaData['full_name'] == null) {
             Navigator.pushReplacement(
@@ -109,14 +112,19 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on AuthException catch (e) {
       if (mounted) {
+        // Better error message handling
+        String msg = e.message;
+        if (msg.contains("Invalid login credentials")) {
+          msg = "Invalid email or password. If you just signed up, please check your email to verify your account.";
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unexpected error occurred'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -178,17 +186,32 @@ class _LoginPageState extends State<LoginPage> {
                         style: TextStyle(color: Colors.grey[600])),
                     const SizedBox(height: 40),
                     
-                    _buildCustomTextField(_emailController, AppTranslations.get('email'), false),
+                    // Email Field
+                    _buildCustomTextField(
+                      controller: _emailController, 
+                      hint: AppTranslations.get('email'), 
+                      obscure: false
+                    ),
                     const SizedBox(height: 20),
-                    _buildCustomTextField(_passwordController, AppTranslations.get('password'), true),
+                    
+                    // Password Field with Eye Toggle
+                    _buildCustomTextField(
+                      controller: _passwordController, 
+                      hint: AppTranslations.get('password'), 
+                      obscure: _obscurePassword,
+                      isPassword: true,
+                      onEyePressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                     
                     const SizedBox(height: 10),
 
-                    // --- Remember Me & Forgot Password Row ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Remember Me Checkbox
                         Row(
                           children: [
                             SizedBox(
@@ -215,7 +238,6 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
 
-                        // Forgot Password Link
                         TextButton(
                           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordPage())),
                           child: Text(AppTranslations.get('forgot_pass'), style: TextStyle(color: Colors.grey[700], fontSize: 12)),
@@ -263,7 +285,13 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildCustomTextField(TextEditingController controller, String hint, bool obscure) {
+  Widget _buildCustomTextField({
+    required TextEditingController controller, 
+    required String hint, 
+    required bool obscure, 
+    bool isPassword = false,
+    VoidCallback? onEyePressed
+  }) {
     return Container(
       decoration: BoxDecoration(color: _lightYellowInput, borderRadius: BorderRadius.circular(15)),
       child: TextField(
@@ -275,6 +303,16 @@ class _LoginPageState extends State<LoginPage> {
           hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5)),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          // Eye Icon Logic
+          suffixIcon: isPassword 
+            ? IconButton(
+                icon: Icon(
+                  obscure ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
+                ),
+                onPressed: onEyePressed,
+              )
+            : null,
         ),
       ),
     );
