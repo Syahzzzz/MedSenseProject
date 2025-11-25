@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:permission_handler/permission_handler.dart'; // Required for permissions
+import 'package:shared_preferences/shared_preferences.dart'; // Required to track if we asked
 import 'main.dart'; 
 import 'location_view.dart'; 
 import 'services_view.dart'; 
@@ -17,13 +19,14 @@ class _DashboardPageState extends State<DashboardPage> {
   // --- State & Dependencies ---
   final _supabase = Supabase.instance.client;
   String _userName = "User"; 
+  String? _avatarUrl; 
   int _selectedIndex = 0; 
   String _selectedServiceCategory = 'Braces';
 
   // --- Data Constants ---
   final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers'];
 
-  // Dynamic getter for services data to support language switching
+  // Dynamic getter for services data
   Map<String, List<Map<String, String>>> get _servicesData => {
     'Braces': [
       {'title': AppTranslations.get('metal_student'), 'duration': AppTranslations.get('est_24_36'), 'price': AppTranslations.get('from_rm150_m')},
@@ -43,7 +46,6 @@ class _DashboardPageState extends State<DashboardPage> {
     ],
   };
 
-  // Dynamic getter for doctors to translate titles if needed
   List<Map<String, String>> get _doctors => [
     {'name': 'Dr. Sarah Smith', 'specialization': AppTranslations.get('dentist_ortho'), 'image': 'images/sarah.png'},
     {'name': 'Dr. John Doe', 'specialization': AppTranslations.get('dentist_surgeon'), 'image': 'images/john.png'},
@@ -54,13 +56,40 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    
+    // Schedule the permission request after the first frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndRequestNotificationPermission();
+    });
   }
 
   // --- Logic ---
+  
+  // Checks if we have asked this user for permission before.
+  // If not, it requests permission and saves the flag.
+  Future<void> _checkAndRequestNotificationPermission() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Check if the key exists. If it doesn't, it's a "new user" regarding this permission.
+    final bool hasAsked = prefs.getBool('has_asked_notifications') ?? false;
+
+    if (!hasAsked) {
+      // Request the permission
+      await Permission.notification.request();
+      // Save that we have asked, so we don't pester the user on every login
+      await prefs.setBool('has_asked_notifications', true);
+    }
+  }
+
   void _loadUserProfile() {
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      setState(() => _userName = user.userMetadata?['full_name'] ?? "User");
+      setState(() {
+        _userName = user.userMetadata?['full_name'] ?? "User";
+        String? url = user.userMetadata?['avatar_url'];
+        if (url != null) {
+        _avatarUrl = "$url?t=${DateTime.now().millisecondsSinceEpoch}";
+        }
+      });
     }
   }
 
@@ -76,7 +105,12 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _onItemTapped(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      if (index == 0 || index == 3) {
+        _loadUserProfile();
+      }
+    });
   }
 
   // --- Main Build ---
@@ -87,13 +121,11 @@ class _DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       
-      // Animated Page Transition
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         child: _getBody(),
       ),
 
-      // Bottom Navigation
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: navBarColor, 
@@ -131,7 +163,6 @@ class _DashboardPageState extends State<DashboardPage> {
     return Center(child: Text(AppTranslations.get('coming_soon')));
   }
 
-  // The Main Dashboard Content
   Widget _buildHome() {
     return SafeArea(
       child: SingleChildScrollView(
@@ -161,7 +192,6 @@ class _DashboardPageState extends State<DashboardPage> {
     ); 
   }
 
-  // 1. Top Header
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween, 
@@ -170,15 +200,22 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: const Icon(Icons.arrow_back), 
           onPressed: _signOut
         ),
-        const CircleAvatar(
-          backgroundColor: Color(0xFFFBC02D), 
-          child: Icon(Icons.person, color: Colors.white)
+        GestureDetector(
+          onTap: () => setState(() => _selectedIndex = 3),
+          child: CircleAvatar(
+            backgroundColor: const Color(0xFFFBC02D), 
+            backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                ? NetworkImage(_avatarUrl!)
+                : null,
+            child: _avatarUrl == null || _avatarUrl!.isEmpty
+                ? const Icon(Icons.person, color: Colors.white)
+                : null,
+          ),
         ),
       ],
     );
   }
 
-  // 2. Greeting Text
   Widget _buildGreeting() {
     return Align(
       alignment: Alignment.centerLeft, 
@@ -189,7 +226,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // 3. Upcoming Appointment Banner
   Widget _buildAppointmentBanner() {
     return Container(
       padding: const EdgeInsets.all(20), 
@@ -299,7 +335,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // 4. Services Header & Categories
   Widget _buildServicesSection() {
     return Column(
       children: [
@@ -337,7 +372,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // 5. Dynamic Service List (Using getter to fetch translated data)
   Widget _buildServicesList() {
     final currentServices = _servicesData[_selectedServiceCategory] ?? [];
     return Column(
@@ -371,7 +405,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // 6. Top Doctors List
   Widget _buildDoctorsSection() {
     return Column(
       children: [

@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'phone_number_input.dart';
 
 class EditProfileView extends StatefulWidget {
   const EditProfileView({super.key});
@@ -11,10 +14,14 @@ class EditProfileView extends StatefulWidget {
 class _EditProfileViewState extends State<EditProfileView> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _dobController = TextEditingController();
+  
   final _supabase = Supabase.instance.client;
   
-  DateTime? _birthday;
   bool _isLoading = false;
+  File? _imageFile;
+  String? _currentAvatarUrl;
 
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
@@ -25,28 +32,148 @@ class _EditProfileViewState extends State<EditProfileView> {
     _loadCurrentData();
   }
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _dobController.dispose();
+    super.dispose();
+  }
+
   void _loadCurrentData() {
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      _nameController.text = user.userMetadata?['full_name'] ?? "";
-      _emailController.text = user.email ?? "";
-      
-      final birthString = user.userMetadata?['birthday'];
-      if (birthString != null) {
-        _birthday = DateTime.tryParse(birthString);
+      setState(() {
+        _nameController.text = user.userMetadata?['full_name'] ?? "";
+        _emailController.text = user.email ?? "";
+        _phoneController.text = user.userMetadata?['phone_number'] ?? "";
+        _dobController.text = user.userMetadata?['dob'] ?? "";
+        _currentAvatarUrl = user.userMetadata?['avatar_url'];
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: _primaryYellow,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    try {
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 600, 
+        maxHeight: 600,
+        imageQuality: 80, // Compress slightly
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gallery Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadImage(String userId) async {
+    if (_imageFile == null) return null;
+
+    try {
+      final fileExt = _imageFile!.path.split('.').last;
+      final fileName = '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      
+      // 1. Upload to Supabase Storage
+      // NOTE: Ensure you have a bucket named 'avatars' and it is set to Public
+      await _supabase.storage.from('avatars').upload(
+        fileName,
+        _imageFile!,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      // 2. Get the public URL
+      final imageUrl = _supabase.storage.from('avatars').getPublicUrl(fileName);
+      return imageUrl;
+    } on StorageException catch (e) {
+      // Specific Storage Error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Storage Error: ${e.message} (Check Bucket Policies)'), 
+            backgroundColor: Colors.red
+          ),
+        );
+      }
+      return null;
+    } catch (e) {
+      // General Error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload Failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return null;
     }
   }
 
   Future<void> _updateProfile() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Update User Metadata (Name & Birthday)
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      String? newAvatarUrl = _currentAvatarUrl;
+
+      // 1. Attempt Upload
+      if (_imageFile != null) {
+        final url = await _uploadImage(user.id);
+        if (url == null && mounted) {
+          // If url is null but we had a file, upload failed. Stop here.
+          setState(() => _isLoading = false);
+          return; 
+        }
+        newAvatarUrl = url;
+      }
+
+      // 2. Update Metadata
+      final String currentEmail = user.email ?? '';
+      final String newEmail = _emailController.text.trim();
+      
       final userAttributes = UserAttributes(
-        email: _emailController.text.trim(), // Note: Changing email sends a confirmation link
+        email: (newEmail.isNotEmpty && newEmail != currentEmail) ? newEmail : null,
         data: {
           'full_name': _nameController.text.trim(),
-          'birthday': _birthday?.toIso8601String(),
+          'phone_number': _phoneController.text.trim(),
+          'dob': _dobController.text.trim(),
+          'avatar_url': newAvatarUrl,
         },
       );
       
@@ -54,9 +181,15 @@ class _EditProfileViewState extends State<EditProfileView> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Profile saved successfully!'), backgroundColor: Colors.green),
         );
         Navigator.pop(context);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Auth Error: ${e.message}'), backgroundColor: Colors.red),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -84,54 +217,86 @@ class _EditProfileViewState extends State<EditProfileView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // --- Avatar Section ---
+            Center(
+              child: GestureDetector(
+                onTap: _pickImage,
+                child: Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _primaryYellow, width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.grey[200],
+                        // Priority: Local File -> Network URL -> Default Icon
+                        backgroundImage: _imageFile != null
+                            ? FileImage(_imageFile!)
+                            : (_currentAvatarUrl != null && _currentAvatarUrl!.isNotEmpty)
+                                ? NetworkImage(_currentAvatarUrl!) as ImageProvider
+                                : null,
+                        child: (_imageFile == null && (_currentAvatarUrl == null || _currentAvatarUrl!.isEmpty))
+                            ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                            : null,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _primaryYellow,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+
             const Text("Full Name", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildTextField(_nameController, "Your Name"),
+            _buildTextField(_nameController, "Your Name", Icons.person_outline),
 
             const SizedBox(height: 20),
 
             const Text("Email Address", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildTextField(_emailController, "Your Email"),
-            const Padding(
-              padding: EdgeInsets.only(top: 5.0),
-              child: Text("Note: Changing email requires re-verification.", style: TextStyle(fontSize: 12, color: Colors.grey)),
+            _buildTextField(_emailController, "Your Email", Icons.email_outlined, readOnly: false),
+
+            const SizedBox(height: 20),
+
+            // Phone Number Widget
+            PhoneNumberInputWidget(
+              controller: _phoneController,
+              label: "Phone Number",
             ),
 
             const SizedBox(height: 20),
 
+            // --- Birthday Section ---
             const Text("Date of Birth", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             GestureDetector(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _birthday ?? DateTime(2000),
-                  firstDate: DateTime(1900),
-                  lastDate: DateTime.now(),
-                  builder: (context, child) {
-                    return Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: ColorScheme.light(primary: _primaryYellow),
-                      ),
-                      child: child!,
-                    );
-                  },
-                );
-                if (picked != null) setState(() => _birthday = picked);
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: _lightYellowInput,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  _birthday == null 
-                    ? "Select Birthday" 
-                    : "${_birthday!.day}/${_birthday!.month}/${_birthday!.year}",
-                  style: const TextStyle(fontSize: 16),
+              onTap: () => _selectDate(context),
+              child: AbsorbPointer(
+                child: _buildTextField(
+                  _dobController, 
+                  "Select Date of Birth", 
+                  Icons.calendar_today_outlined,
                 ),
               ),
             ),
@@ -159,16 +324,18 @@ class _EditProfileViewState extends State<EditProfileView> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint) {
+  Widget _buildTextField(TextEditingController controller, String hint, IconData icon, {bool readOnly = false}) {
     return Container(
       decoration: BoxDecoration(
-        color: _lightYellowInput,
+        color: readOnly ? Colors.grey[200] : _lightYellowInput,
         borderRadius: BorderRadius.circular(15),
       ),
       child: TextField(
         controller: controller,
+        readOnly: readOnly,
         decoration: InputDecoration(
           hintText: hint,
+          prefixIcon: Icon(icon, color: Colors.grey),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),

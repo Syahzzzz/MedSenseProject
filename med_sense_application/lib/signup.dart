@@ -12,28 +12,65 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
+  // Controllers
+  final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _dobController = TextEditingController(); // For Date of Birth display
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   
   final _supabase = Supabase.instance.client;
   bool _isLoading = false;
   
   bool _agreeToTerms = false;
   bool _isOku = false;
+  DateTime? _selectedDate; // To store the actual Date object
 
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
 
   @override
   void dispose() {
+    _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _dobController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  // --- SHOW TERMS & CONDITIONS DIALOG (UPDATED FOR TRANSLATIONS) ---
+  // --- DATE PICKER LOGIC ---
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000), // Default to year 2000
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: _primaryYellow,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        // Format date as YYYY-MM-DD for display/storage
+        _dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
+  // --- SHOW TERMS & CONDITIONS DIALOG ---
   void _showTermsDialog() {
     showDialog(
       context: context,
@@ -91,21 +128,39 @@ class _SignupPageState extends State<SignupPage> {
   }
 
   Future<void> _handleSignup() async {
+    // --- VALIDATION ---
+    if (_fullNameController.text.trim().isEmpty) {
+      _showError("Please enter your full name");
+      return;
+    }
+    if (_emailController.text.trim().isEmpty || !_emailController.text.contains('@')) {
+      _showError("Please enter a valid email");
+      return;
+    }
+    if (_dobController.text.isEmpty) {
+      _showError("Please select your date of birth");
+      return;
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      _showError("Passwords do not match");
+      return;
+    }
     if (!_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to the Terms & Conditions')),
-      );
+      _showError('Please agree to the Terms & Conditions');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
+      // Sign up with Supabase
       await _supabase.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         data: {
+          'full_name': _fullNameController.text.trim(),
           'phone_number': _phoneController.text.trim(),
+          'dob': _dobController.text.trim(), // Save DOB to metadata
           'is_oku': _isOku,
         },
       );
@@ -120,22 +175,20 @@ class _SignupPageState extends State<SignupPage> {
         Navigator.pop(context); 
       }
     } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
-        );
-      }
+      if (mounted) _showError(e.message);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unexpected error occurred'), backgroundColor: Colors.redAccent),
-        );
-      }
+      if (mounted) _showError('Unexpected error occurred');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+    );
   }
 
   @override
@@ -152,6 +205,7 @@ class _SignupPageState extends State<SignupPage> {
       ),
       body: Column(
         children: [
+          // --- Top Section: Illustration ---
           Expanded(
             flex: 2,
             child: Center(
@@ -167,6 +221,8 @@ class _SignupPageState extends State<SignupPage> {
               ),
             ),
           ),
+          
+          // --- Bottom Section: Form ---
           Expanded(
             flex: 6,
             child: Container(
@@ -191,11 +247,38 @@ class _SignupPageState extends State<SignupPage> {
                     Text(AppTranslations.get('start_journey_subtitle'), style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                     const SizedBox(height: 30),
 
+                    // 1. Full Name
+                    _buildCustomTextField(_fullNameController, AppTranslations.get('full_name'), false),
+                    const SizedBox(height: 15),
+
+                    // 2. Email
                     _buildCustomTextField(_emailController, AppTranslations.get('email'), false),
                     const SizedBox(height: 15),
+
+                    // 3. Phone Number
                     _buildCustomTextField(_phoneController, AppTranslations.get('phone_number'), false, keyboardType: TextInputType.phone),
                     const SizedBox(height: 15),
+
+                    // 4. Date of Birth (Clickable Field)
+                    GestureDetector(
+                      onTap: () => _selectDate(context),
+                      child: AbsorbPointer( // Prevents keyboard from opening
+                        child: _buildCustomTextField(
+                          _dobController, 
+                          AppTranslations.get('select_birthday'), // Ensure this key exists or use "Date of Birth"
+                          false,
+                          icon: Icons.calendar_today_outlined
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    // 5. Password
                     _buildCustomTextField(_passwordController, AppTranslations.get('password'), true),
+                    const SizedBox(height: 15),
+
+                    // 6. Confirm Password
+                    _buildCustomTextField(_confirmPasswordController, AppTranslations.get('confirm_pass'), true),
                     
                     const SizedBox(height: 20),
 
@@ -278,7 +361,7 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
-  Widget _buildCustomTextField(TextEditingController controller, String hint, bool obscure, {TextInputType? keyboardType}) {
+  Widget _buildCustomTextField(TextEditingController controller, String hint, bool obscure, {TextInputType? keyboardType, IconData? icon}) {
     return Container(
       decoration: BoxDecoration(color: _lightYellowInput, borderRadius: BorderRadius.circular(15)),
       child: TextField(
@@ -289,9 +372,11 @@ class _SignupPageState extends State<SignupPage> {
         style: const TextStyle(fontSize: 16, color: Colors.black87),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5), fontSize: 18),
+          hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5), fontSize: 16),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          // Optional icon (used for Date of Birth)
+          suffixIcon: icon != null ? Icon(icon, color: Colors.grey) : null,
         ),
       ),
     );
