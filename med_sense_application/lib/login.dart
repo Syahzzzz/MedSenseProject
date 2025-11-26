@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart'; 
 import 'signup.dart';
 import 'forgot_password.dart';
-import 'onboarding_name.dart';
 import 'dashboard.dart';
 import 'translations.dart';
 
@@ -50,7 +49,6 @@ class _LoginPageState extends State<LoginPage> {
           _passwordController.text = savedPassword;
           _rememberMe = true;
         });
-        // Removed _handleLogin() here so you can verify credentials first
       }
     }
   }
@@ -87,29 +85,20 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setBool('remember_me_status', false);
       }
 
+      // ignore: unused_local_variable
       final AuthResponse response = await _supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
+      // --- LOGIC UPDATED HERE: Removed Onboarding Check ---
       if (mounted) {
-        final user = response.user;
-        final metaData = user?.userMetadata;
-        
-        if (mounted) {
-          if (metaData == null || metaData['full_name'] == null) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const OnboardingNamePage()),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const DashboardPage()),
-            );
-          }
-        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
       }
+      
     } on AuthException catch (e) {
       if (mounted) {
         // Better error message handling
