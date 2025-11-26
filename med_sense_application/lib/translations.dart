@@ -141,6 +141,19 @@ class AppTranslations {
       'enter_new_pass': 'Enter new password',
       'reenter_new_pass': 'Re-enter new password',
       'select_birthday': 'Select Birthday',
+
+      // --- Review & Confirm ---
+      'review_confirm': 'Review and confirm',
+      'with': 'with',
+      'subtotal': 'Subtotal',
+      'total': 'Total',
+      'pay_now': 'Pay now',
+      'pay_at_venue': 'Pay at venue',
+      'payment_method': 'Payment method',
+      'credit_debit': 'Credit/debit',
+      'online_banking': 'Online Banking',
+      'confirm': 'Confirm',
+      'booking_success': 'Booking Successful!',
     },
     'Bahasa Melayu': {
       // --- Auth ---
@@ -272,6 +285,19 @@ class AppTranslations {
       'enter_new_pass': 'Masukkan kata laluan baru',
       'reenter_new_pass': 'Masukkan semula kata laluan baru',
       'select_birthday': 'Pilih Hari Jadi',
+
+      // --- Review & Confirm ---
+      'review_confirm': 'Semak dan Sahkan',
+      'with': 'bersama',
+      'subtotal': 'Subjumlah',
+      'total': 'Jumlah',
+      'pay_now': 'Bayar sekarang',
+      'pay_at_venue': 'Bayar di klinik',
+      'payment_method': 'Kaedah Pembayaran',
+      'credit_debit': 'Kredit/Debit',
+      'online_banking': 'Perbankan Atas Talian',
+      'confirm': 'Sahkan',
+      'booking_success': 'Tempahan Berjaya!',
     },
     'Mandarin': {
       // --- Auth ---
@@ -403,6 +429,19 @@ class AppTranslations {
       'enter_new_pass': '输入新密码',
       'reenter_new_pass': '重新输入新密码',
       'select_birthday': '选择生日',
+
+      // --- Review & Confirm ---
+      'review_confirm': '审查并确认',
+      'with': '与',
+      'subtotal': '小计',
+      'total': '总计',
+      'pay_now': '立即付款',
+      'pay_at_venue': '到店付款',
+      'payment_method': '付款方式',
+      'credit_debit': '信用卡/借记卡',
+      'online_banking': '网上银行',
+      'confirm': '确认',
+      'booking_success': '预订成功！',
     },
   };
 }

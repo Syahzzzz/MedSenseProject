@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:permission_handler/permission_handler.dart'; // Required for permissions
-import 'package:shared_preferences/shared_preferences.dart'; // Required to track if we asked
+import 'package:permission_handler/permission_handler.dart'; 
+import 'package:shared_preferences/shared_preferences.dart'; 
 import 'main.dart'; 
 import 'location_view.dart'; 
 import 'services_view.dart'; 
@@ -23,28 +23,12 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0; 
   String _selectedServiceCategory = 'Braces';
 
+  // Dynamic Services Data
+  bool _isServicesLoading = true;
+  Map<String, List<Map<String, String>>> _servicesData = {};
+
   // --- Data Constants ---
   final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers'];
-
-  // Dynamic getter for services data
-  Map<String, List<Map<String, String>>> get _servicesData => {
-    'Braces': [
-      {'title': AppTranslations.get('metal_student'), 'duration': AppTranslations.get('est_24_36'), 'price': AppTranslations.get('from_rm150_m')},
-      {'title': AppTranslations.get('metal_deposit'), 'duration': AppTranslations.get('est_24_36'), 'price': AppTranslations.get('from_rm150_m')},
-      {'title': AppTranslations.get('ceramic_deposit'), 'duration': AppTranslations.get('est_24_36'), 'price': AppTranslations.get('from_rm175_m')},
-    ],
-    'Scaling': [
-      {'title': AppTranslations.get('basic_scaling'), 'duration': AppTranslations.get('est_30_45'), 'price': AppTranslations.get('from_rm100')},
-      {'title': AppTranslations.get('deep_cleaning'), 'duration': AppTranslations.get('est_60'), 'price': AppTranslations.get('from_rm250')},
-    ],
-    'Whitening': [
-      {'title': AppTranslations.get('home_whitening'), 'duration': AppTranslations.get('take_home_kit'), 'price': AppTranslations.get('from_rm400')},
-      {'title': AppTranslations.get('zoom_whitening'), 'duration': AppTranslations.get('est_60'), 'price': AppTranslations.get('from_rm900')},
-    ],
-    'Retainers': [
-      {'title': AppTranslations.get('clear_retainers'), 'duration': AppTranslations.get('production_1_week'), 'price': AppTranslations.get('from_rm400')},
-    ],
-  };
 
   List<Map<String, String>> get _doctors => [
     {'name': 'Dr. Sarah Smith', 'specialization': AppTranslations.get('dentist_ortho'), 'image': 'images/sarah.png'},
@@ -56,26 +40,86 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _fetchServices(); // Load services on init
     
-    // Schedule the permission request after the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestNotificationPermission();
     });
   }
 
-  // --- Logic ---
-  
-  // Checks if we have asked this user for permission before.
-  // If not, it requests permission and saves the flag.
+  // --- Fetch Services from Supabase ---
+  Future<void> _fetchServices() async {
+    if (!mounted) return;
+    setState(() => _isServicesLoading = true);
+    
+    try {
+      // Fetch services from DB
+      final List<dynamic> response = await _supabase
+          .from('Service') 
+          .select('service_name, description, estimated_duration_minutes')
+          .order('service_name', ascending: true);
+
+      final Map<String, List<Map<String, String>>> categorized = {
+        'Braces': [],
+        'Scaling': [],
+        'Whitening': [],
+        'Retainers': [],
+      };
+
+      for (var item in response) {
+        final String name = item['service_name'] as String;
+        final String rawDesc = item['description'] as String? ?? '';
+        final int duration = item['estimated_duration_minutes'] as int? ?? 0;
+        
+        // Parse price line from description (e.g. "Price: RM 100")
+        String priceText = "Price upon consultation";
+        final lines = rawDesc.split('\n');
+        for (var line in lines) {
+           if (line.trim().startsWith('Price:') || line.trim().startsWith('From RM') || line.trim().contains('RM')) {
+             priceText = line.trim();
+             break;
+           }
+        }
+
+        // Basic categorization logic based on keywords
+        String category = 'Other';
+        if (name.contains('Braces') || name.contains('Invisalign') || name.contains('Retainer Bond')) {
+          category = 'Braces';
+        } else if (name.contains('Scaling') || name.contains('Polishing') || name.contains('Cleaning') || name.contains('Periodontal')) {
+          category = 'Scaling';
+        } else if (name.contains('Whitening') || name.contains('Bleaching')) {
+          category = 'Whitening';
+        } else if (name.contains('Retainer') && !name.contains('Bond')) {
+          category = 'Retainers';
+        } 
+
+        if (categorized.containsKey(category)) {
+          categorized[category]!.add({
+            'title': name,
+            'duration': 'Est. $duration mins',
+            'price': priceText,
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _servicesData = categorized;
+          _isServicesLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading services for dashboard: $e');
+      if (mounted) setState(() => _isServicesLoading = false);
+    }
+  }
+
   Future<void> _checkAndRequestNotificationPermission() async {
     final prefs = await SharedPreferences.getInstance();
-    // Check if the key exists. If it doesn't, it's a "new user" regarding this permission.
     final bool hasAsked = prefs.getBool('has_asked_notifications') ?? false;
 
     if (!hasAsked) {
-      // Request the permission
       await Permission.notification.request();
-      // Save that we have asked, so we don't pester the user on every login
       await prefs.setBool('has_asked_notifications', true);
     }
   }
@@ -83,6 +127,9 @@ class _DashboardPageState extends State<DashboardPage> {
   void _loadUserProfile() {
     final user = _supabase.auth.currentUser;
     if (user != null) {
+      // Try to get from DB Patient table first if possible, or fallback to metadata
+      // For simplicity here we use metadata + local state update like fetching profile
+      // Ideally fetch from 'Patient' table similar to ProfileView
       setState(() {
         _userName = user.userMetadata?['full_name'] ?? "User";
         String? url = user.userMetadata?['avatar_url'];
@@ -159,7 +206,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _getBody() {
     if (_selectedIndex == 0) return _buildHome();
     if (_selectedIndex == 1) return LocationView(onBack: () => setState(() => _selectedIndex = 0));
-    if (_selectedIndex == 2) return const ServicesView(); // Booking Tab now opens Services List
+    if (_selectedIndex == 2) return const ServicesView(); 
     if (_selectedIndex == 3) return const ProfileView();
     return Center(child: Text(AppTranslations.get('coming_soon')));
   }
@@ -183,7 +230,11 @@ class _DashboardPageState extends State<DashboardPage> {
             _buildServicesSection(),
             const SizedBox(height: 20),
             
-            _buildServicesList(),
+            // Show loading or the list
+            _isServicesLoading 
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFFBC02D)))
+                : _buildServicesList(),
+                
             const SizedBox(height: 30),
             
             _buildDoctorsSection(),
@@ -197,7 +248,6 @@ class _DashboardPageState extends State<DashboardPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween, 
       children: [
-        // Updated: Logout Button instead of back arrow
         IconButton(
           icon: const Icon(Icons.logout), 
           color: Colors.redAccent,
@@ -232,8 +282,8 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              _signOut(); // Perform logout
+              Navigator.pop(context); 
+              _signOut(); 
             },
             child: Text(AppTranslations.get('logout'), style: const TextStyle(color: Colors.redAccent)),
           ),
@@ -400,6 +450,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildServicesList() {
     final currentServices = _servicesData[_selectedServiceCategory] ?? [];
+    
+    if (currentServices.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Center(child: Text("No services available for $_selectedServiceCategory")),
+      );
+    }
+
     return Column(
       children: currentServices.map((s) => Container(
         width: double.infinity,

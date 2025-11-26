@@ -3,10 +3,11 @@ import 'booking_datetime_view.dart';
 import 'dashboard.dart';
 
 class BookingSummaryView extends StatelessWidget {
-  final String serviceCategory; // e.g., "Scaling"
-  final String serviceTitle;    // e.g., "Basic Scaling & Polishing"
-  final String price;           // e.g., "From RM100"
-  final String duration;        // e.g., "Est. 30-45 mins"
+  final String serviceCategory; 
+  final String serviceTitle;    
+  final String price;           
+  final String duration;        
+  final String description; // Added to parse details from
 
   const BookingSummaryView({
     super.key,
@@ -14,6 +15,7 @@ class BookingSummaryView extends StatelessWidget {
     required this.serviceTitle,
     required this.price,
     required this.duration,
+    required this.description, // Receive full description
   });
 
   void _handleBack(BuildContext context) {
@@ -27,21 +29,75 @@ class BookingSummaryView extends StatelessWidget {
     }
   }
 
+  // Helper to parse the description from DB into a breakdown list
+  List<Map<String, String>> _getBreakdown() {
+    // If the description has explicit price lines (e.g. "Deposit: RM 500"), use them.
+    // Otherwise, use standard defaults based on category/name.
+    
+    List<Map<String, String>> items = [];
+    
+    // 1. Try to parse explicit lines from DB description
+    final lines = description.split('\n');
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+      
+      // If line contains price indicators
+      if (line.startsWith('Price:') || line.startsWith('Deposit:') || line.startsWith('Monthly:')) {
+        final parts = line.split(':');
+        if (parts.length >= 2) {
+          items.add({
+            'item': parts[0].trim(),
+            'price': parts[1].trim(),
+          });
+        }
+      }
+    }
+
+    // 2. If no specific price lines found, fall back to generic breakdown logic
+    if (items.isEmpty) {
+      if (serviceTitle.contains("Scaling")) {
+        items = [
+          {'item': 'Consultation & Diagnosis', 'price': 'RM 50'},
+          {'item': 'Procedure Fee', 'price': price}, // Use the passed total price
+        ];
+      } else if (serviceTitle.contains("Braces")) {
+        items = [
+          {'item': 'Consultation & X-ray', 'price': 'RM 200'},
+          {'item': 'Braces Deposit/Fee', 'price': price},
+        ];
+      } else if (serviceTitle.contains("Whitening")) {
+        items = [
+          {'item': 'Dental Assessment', 'price': 'RM 50'},
+          {'item': 'Whitening Kit/Procedure', 'price': price},
+        ];
+      } else {
+        items = [
+          {'item': 'Consultation', 'price': 'RM 50'},
+          {'item': 'Procedure', 'price': price},
+        ];
+      }
+    }
+    
+    return items;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Matches the dark background in the image
-    const Color backgroundColor = Color(0xFF1E1E1E); 
-    // Matches the pale yellow card
+    // Application Theme Yellow
+    const Color backgroundColor = Color(0xFFFBC02D); 
     const Color cardYellow = Color(0xFFFFF9C4); 
 
-    final List<Map<String, String>> breakdown = _getBreakdown(serviceCategory);
+    final List<Map<String, String>> breakdown = _getBreakdown();
 
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
-        // Lowercase title as per image
-        title: const Text('CONFIRM BOOKING', style: TextStyle(color: Colors.white, fontSize: 18)),
-        centerTitle: true, // Centered title
+        title: const Text(
+          'CONFIRM BOOKING', 
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+        ),
+        centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -51,9 +107,8 @@ class BookingSummaryView extends StatelessWidget {
       ),
       body: Column(
         children: [
-          const SizedBox(height: 20), // Spacing below app bar
+          const SizedBox(height: 20),
           
-          // The Main Yellow Card
           Expanded(
             child: Container(
               width: double.infinity,
@@ -68,14 +123,14 @@ class BookingSummaryView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header: Title and Close Icon
+                  // Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Text(
-                          serviceCategory, // e.g. "Scaling"
+                          serviceCategory, 
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -92,12 +147,11 @@ class BookingSummaryView extends StatelessWidget {
                   
                   const SizedBox(height: 30),
 
-                  // Subtitle (e.g. "-Basic Scaling & Polishing")
                   Text(
                     "-$serviceTitle",
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w900, // Extra bold
+                      fontWeight: FontWeight.w900,
                       color: Colors.black,
                     ),
                   ),
@@ -115,7 +169,6 @@ class BookingSummaryView extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                // Item Name
                                 Expanded(
                                   flex: 6,
                                   child: Text(
@@ -127,7 +180,6 @@ class BookingSummaryView extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                // Price
                                 Expanded(
                                   flex: 4,
                                   child: Text(
@@ -135,7 +187,7 @@ class BookingSummaryView extends StatelessWidget {
                                     textAlign: TextAlign.right,
                                     style: const TextStyle(
                                       fontSize: 15,
-                                      fontWeight: FontWeight.bold, // Bold price
+                                      fontWeight: FontWeight.bold,
                                       color: Colors.black,
                                     ),
                                   ),
@@ -151,24 +203,23 @@ class BookingSummaryView extends StatelessWidget {
                   // Bottom Footer
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end, // Align bottom
+                    crossAxisAlignment: CrossAxisAlignment.end, 
                     children: [
-                      // Price & Duration
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            price, // e.g. "From RM100"
+                            price,
                             style: const TextStyle(
                               fontSize: 22,
-                              fontWeight: FontWeight.w900, // Extra Bold
+                              fontWeight: FontWeight.w900, 
                               color: Colors.black,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            duration, // e.g. "Est. 30-45 mins"
+                            duration,
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.black.withValues(alpha: 0.6),
@@ -177,7 +228,6 @@ class BookingSummaryView extends StatelessWidget {
                         ],
                       ),
                       
-                      // Confirm Button
                       SizedBox(
                         height: 45,
                         child: ElevatedButton(
@@ -193,8 +243,8 @@ class BookingSummaryView extends StatelessWidget {
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white, // White button
-                            foregroundColor: Colors.black, // Black text
+                            backgroundColor: backgroundColor, 
+                            foregroundColor: Colors.black, 
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(horizontal: 30),
                             shape: RoundedRectangleBorder(
@@ -219,43 +269,5 @@ class BookingSummaryView extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  // Dynamic breakdown data based on category
-  List<Map<String, String>> _getBreakdown(String category) {
-    // Scaling logic (Matches your image)
-    if (category.contains("Scaling")) {
-      return [
-        {'item': 'Consultation & Diagnosis', 'price': 'Rm50'},
-        {'item': 'Procedure Fee', 'price': 'Rm100 - Rm300'},
-        {'item': 'Medication (if applicable)', 'price': 'Rm30'},
-        {'item': 'Follow-up appointment', 'price': 'Free'},
-      ];
-    }
-    // Braces logic
-    if (category.contains("Braces")) {
-      return [
-        {'item': 'Braces consultation\nXray\nMoulding', 'price': 'Rm200'},
-        {'item': 'Scaling & polishing\nUpper braces', 'price': 'Rm499\n(Deposit)'},
-        {'item': 'Lower braces\nMonthly payment', 'price': 'Rm150'},
-        {'item': 'Extraction/filling (if needed)', 'price': 'Rm120'},
-        {'item': 'Braces removal and retainer', 'price': 'Rm700'},
-        {'item': 'Bond bracket (per bracket)', 'price': 'Rm60'},
-      ];
-    }
-    // Whitening logic
-    if (category.contains("Whitening")) {
-      return [
-        {'item': 'Dental Assessment', 'price': 'Rm50'},
-        {'item': 'Whitening Procedure', 'price': 'Rm800'},
-        {'item': 'Take-home Kit', 'price': 'Rm150'},
-        {'item': 'Desensitizing Gel', 'price': 'Free'},
-      ];
-    }
-    // Default fallback
-    return [
-      {'item': 'Consultation', 'price': 'Rm50'},
-      {'item': 'Procedure', 'price': 'TBD'},
-    ];
   }
 }
