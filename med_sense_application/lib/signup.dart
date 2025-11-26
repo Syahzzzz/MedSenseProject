@@ -408,6 +408,16 @@ class _SignupPageState extends State<SignupPage> {
           hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5), fontSize: 16),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          
+          // Balance the layout:
+          // If there is a suffix (either a password eye icon or a generic icon like calendar),
+          // we place an invisible prefix of roughly the same size to ensure the text centers perfectly.
+          prefixIcon: isPassword
+              ? const SizedBox(width: 48, height: 48) // Standard IconButton size balance
+              : (icon != null 
+                  ? const SizedBox(width: 48, height: 48) // Approx balance for Icon in suffix
+                  : null),
+
           suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(

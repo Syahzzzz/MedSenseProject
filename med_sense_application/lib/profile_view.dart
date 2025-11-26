@@ -206,9 +206,69 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Future<void> _handleLogout() async {
+  // Shows confirmation dialog with "Remember Me" reset warning
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppTranslations.get('logout'), style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Are you sure you want to log out?"),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: Colors.orange.shade800),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "This will reset your 'Remember Me' preferences. You will need to enter your email and password next time.",
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppTranslations.get('cancel'), style: const TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              _performLogout(); // Execute logout
+            },
+            child: Text(AppTranslations.get('logout'), style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performLogout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    
+    // Explicitly remove remember me credentials
+    await prefs.remove('remember_me_email');
+    await prefs.remove('remember_me_password');
+    await prefs.setBool('remember_me_status', false);
+    
+    // Or clear everything if that is preferred
+    // await prefs.clear(); 
+
     await _supabase.auth.signOut();
 
     if (mounted) {
@@ -318,12 +378,12 @@ class _ProfileViewState extends State<ProfileView> {
 
             const SizedBox(height: 40),
 
-            // Logout Button
+            // Logout Button with Confirmation
             SizedBox(
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: _handleLogout,
+                onPressed: _showLogoutConfirmation, // Updated to show dialog
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red[50],
                   foregroundColor: Colors.red,

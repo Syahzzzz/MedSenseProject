@@ -34,6 +34,17 @@ class AppTranslations {
       'i_agree': 'I Agree',
       'close': 'Close',
       
+      // --- Onboarding ---
+      'onboarding_1_title': 'Welcome to MedSense',
+      'onboarding_1_desc': 'Your smart companion for a seamless clinic experience. Manage appointments and queues with ease.',
+      'onboarding_2_title': 'AI-Powered Estimations',
+      'onboarding_2_desc': 'No more guessing! Our AI predicts exactly when you need to be at the clinic, saving your valuable time.',
+      'onboarding_3_title': 'Inclusive Healthcare',
+      'onboarding_3_desc': 'Designed for everyone. Specialized features for OKU and elderly patients to ensure equal access for all.',
+      'next': 'Next',
+      'skip': 'Skip',
+      'get_started': 'Get Started',
+
       // --- Terms & Conditions Content ---
       'tc_1_title': 'Acceptance of Terms',
       'tc_1_content': 'By creating an account on MedSense, you agree to comply with and be bound by these Terms and Conditions.',
@@ -155,6 +166,17 @@ class AppTranslations {
       'i_agree': 'Saya Setuju',
       'close': 'Tutup',
 
+      // --- Onboarding ---
+      'onboarding_1_title': 'Selamat Datang ke MedSense',
+      'onboarding_1_desc': 'Rakan klinik pintar anda untuk pengalaman yang lancar. Urus janji temu dan giliran dengan mudah.',
+      'onboarding_2_title': 'Anggaran Dikuasakan AI',
+      'onboarding_2_desc': 'Tiada lagi tekaan! AI kami meramalkan bila giliran anda, menjimatkan masa berharga anda.',
+      'onboarding_3_title': 'Penjagaan Kesihatan Inklusif',
+      'onboarding_3_desc': 'Direka untuk semua. Ciri khas untuk OKU dan warga emas bagi memastikan akses saksama.',
+      'next': 'Seterusnya',
+      'skip': 'Langkau',
+      'get_started': 'Mula Sekarang',
+
       // --- Terms & Conditions Content ---
       'tc_1_title': 'Penerimaan Terma',
       'tc_1_content': 'Dengan membuat akaun di MedSense, anda bersetuju untuk mematuhi dan terikat dengan Terma dan Syarat ini.',
@@ -274,6 +296,17 @@ class AppTranslations {
       'oku_checkbox': '我是残障人士 (OKU)。启用辅助功能',
       'i_agree': '我同意',
       'close': '关闭',
+
+      // --- Onboarding ---
+      'onboarding_1_title': '欢迎来到 MedSense',
+      'onboarding_1_desc': '您的智能诊所伴侣，带来无缝体验。轻松管理预约和排队。',
+      'onboarding_2_title': 'AI 智能估算',
+      'onboarding_2_desc': '不再猜测！我们的 AI 准确预测您何时需要到达诊所，节省您的宝贵时间。',
+      'onboarding_3_title': '包容性医疗',
+      'onboarding_3_desc': '为每个人设计。专为残障人士 (OKU) 和老年人提供的特殊功能，确保平等使用。',
+      'next': '下一步',
+      'skip': '跳过',
+      'get_started': '开始使用',
 
       // --- Terms & Conditions Content ---
       'tc_1_title': '接受条款',

@@ -159,6 +159,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _getBody() {
     if (_selectedIndex == 0) return _buildHome();
     if (_selectedIndex == 1) return LocationView(onBack: () => setState(() => _selectedIndex = 0));
+    if (_selectedIndex == 2) return const ServicesView(); // Booking Tab now opens Services List
     if (_selectedIndex == 3) return const ProfileView();
     return Center(child: Text(AppTranslations.get('coming_soon')));
   }
@@ -196,9 +197,11 @@ class _DashboardPageState extends State<DashboardPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween, 
       children: [
+        // Updated: Logout Button instead of back arrow
         IconButton(
-          icon: const Icon(Icons.arrow_back), 
-          onPressed: _signOut
+          icon: const Icon(Icons.logout), 
+          color: Colors.redAccent,
+          onPressed: () => _showLogoutConfirmation(context),
         ),
         GestureDetector(
           onTap: () => setState(() => _selectedIndex = 3),
@@ -213,6 +216,29 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showLogoutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppTranslations.get('logout')),
+        content: const Text("Are you sure you want to log out?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppTranslations.get('cancel'), style: const TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              _signOut(); // Perform logout
+            },
+            child: Text(AppTranslations.get('logout'), style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
     );
   }
 

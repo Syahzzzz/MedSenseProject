@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'translations.dart'; // Import translations
+import 'language_selector_widget.dart'; // Import language widget
 import 'login.dart';
 import 'signup.dart';
 
@@ -126,8 +127,6 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     const SizedBox(width: 12),
                     // Styled Text
-                    // Note: We use AppTranslations.get here if you want the title translated too, 
-                    // but usually app names stay in English.
                     const Text(
                       'MedSense',
                       style: TextStyle(
@@ -145,6 +144,24 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+          ),
+
+          // --- Language Button (Top Right) ---
+          Positioned(
+            top: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const LanguageAppBarButton(color: Colors.white),
                 ),
               ),
             ),

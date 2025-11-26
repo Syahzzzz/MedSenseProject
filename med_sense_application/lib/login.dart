@@ -4,7 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'signup.dart';
 import 'forgot_password.dart';
 import 'dashboard.dart';
+import 'onboarding_view.dart';
 import 'translations.dart';
+import 'language_selector_widget.dart'; 
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -85,18 +87,30 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setBool('remember_me_status', false);
       }
 
-      // ignore: unused_local_variable
       final AuthResponse response = await _supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // --- LOGIC UPDATED HERE: Removed Onboarding Check ---
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()),
-        );
+      // --- LOGIC UPDATED: User-Specific Onboarding Check ---
+      final user = response.user;
+      if (user != null) {
+        final String onboardingKey = 'has_seen_onboarding_${user.id}';
+        final bool hasSeenOnboarding = prefs.getBool(onboardingKey) ?? false;
+
+        if (mounted) {
+          if (hasSeenOnboarding) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardPage()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const OnboardingView()),
+            );
+          }
+        }
       }
       
     } on AuthException catch (e) {
@@ -134,6 +148,10 @@ class _LoginPageState extends State<LoginPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: const [
+          LanguageAppBarButton(color: Colors.white),
+          SizedBox(width: 12),
+        ],
       ),
       body: Column(
         children: [
@@ -292,7 +310,12 @@ class _LoginPageState extends State<LoginPage> {
           hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5)),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          // Eye Icon Logic
+          
+          // --- FIX: Add invisible prefix to balance the suffix icon ---
+          prefixIcon: isPassword
+              ? const SizedBox(width: 48, height: 48) // Standard icon button size
+              : null,
+
           suffixIcon: isPassword 
             ? IconButton(
                 icon: Icon(

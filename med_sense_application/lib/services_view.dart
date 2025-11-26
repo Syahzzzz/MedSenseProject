@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'translations.dart';
+import 'booking_summary_view.dart'; // Import the new summary view
+import 'dashboard.dart'; // Import Dashboard for navigation
 
 class ServicesView extends StatefulWidget {
   const ServicesView({super.key});
@@ -9,13 +11,9 @@ class ServicesView extends StatefulWidget {
 }
 
 class _ServicesViewState extends State<ServicesView> {
-  // Selected category state
   String _selectedCategory = 'Braces';
-
-  // Categories (Hardcoded IDs map to translation keys)
   final List<String> _categories = ['Braces', 'Scaling', 'Whitening', 'Retainers'];
 
-  // Mock Data Getter to support live translation
   Map<String, List<Map<String, String>>> get _servicesData => {
     'Braces': [
       {
@@ -77,11 +75,20 @@ class _ServicesViewState extends State<ServicesView> {
     ],
   };
 
+  void _handleBack() {
+    // Instead of just popping, we explicitly push replacement to Dashboard
+    // This ensures we don't accidentally go back to Login if the stack was messy
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const DashboardPage()),
+      (route) => false, // Remove all previous routes
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Colors
     final Color primaryYellow = const Color(0xFFFBC02D);
-    final Color chipColor = const Color(0xFFFFF59D); // Light yellow for tabs
+    final Color chipColor = const Color(0xFFFFF59D);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -89,15 +96,14 @@ class _ServicesViewState extends State<ServicesView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Header ---
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.reply, size: 32, color: Colors.black54),
+                    onTap: _handleBack, // Updated back navigation
+                    child: const Icon(Icons.arrow_back, size: 28, color: Colors.black), // Consistent Icon
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -108,7 +114,6 @@ class _ServicesViewState extends State<ServicesView> {
               ),
             ),
 
-            // --- Categories Tabs ---
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -153,7 +158,6 @@ class _ServicesViewState extends State<ServicesView> {
 
             const SizedBox(height: 30),
 
-            // --- Service List ---
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -199,29 +203,37 @@ class _ServicesViewState extends State<ServicesView> {
                               ),
                             ),
                             
-                            // Plus Button
-                            Container(
-                              width: 35,
-                              height: 35,
-                              decoration: BoxDecoration(
-                                color: primaryYellow,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ],
-                              ),
-                              child: IconButton(
-                                icon: const Icon(Icons.add, size: 20, color: Colors.black),
+                            const SizedBox(width: 10),
+
+                            SizedBox(
+                              height: 36,
+                              child: ElevatedButton(
                                 onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("Selected: ${service['title']}")),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => BookingSummaryView(
+                                        serviceCategory: AppTranslations.get(_selectedCategory),
+                                        serviceTitle: service['title']!,
+                                        price: service['price']!,
+                                        duration: service['duration']!,
+                                      ),
+                                    ),
                                   );
                                 },
-                                padding: EdgeInsets.zero,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryYellow,
+                                  foregroundColor: Colors.black,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                                child: const Text(
+                                  "Book",
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
                               ),
                             ),
                           ],
