@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dashboard.dart';
 import 'translations.dart';
 
@@ -8,6 +7,7 @@ class ReviewConfirmView extends StatefulWidget {
   final String clinicAddress;
   final String serviceName;
   final String servicePrice;
+  final String description; // Added parameter
   final DateTime date;
   final String time;
   final String doctorName; // NEW Parameter
@@ -18,6 +18,7 @@ class ReviewConfirmView extends StatefulWidget {
     required this.clinicAddress,
     required this.serviceName,
     required this.servicePrice,
+    required this.description, // Required
     required this.date,
     required this.time,
     required this.doctorName, // Required
@@ -58,7 +59,31 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
 
   // --- Helper to get breakdown items based on service name ---
   List<Map<String, String>> _getBreakdown(String serviceName) {
-    // Logic copied/adapted from BookingSummaryView to match details
+    // 1. Try to parse explicit lines from DB description (passed as widget.description)
+    List<Map<String, String>> items = [];
+    final lines = widget.description.split('\n');
+    
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+      
+      // If line contains price indicators
+      if (line.startsWith('Price:') || line.startsWith('Deposit:') || line.startsWith('Monthly:')) {
+        final parts = line.split(':');
+        if (parts.length >= 2) {
+          items.add({
+            'item': parts[0].trim(),
+            'price': parts[1].trim(),
+          });
+        }
+      }
+    }
+
+    if (items.isNotEmpty) {
+      return items;
+    }
+
+    // Logic copied/adapted from BookingSummaryView to match details if parsing fails
     if (serviceName.contains("Scaling")) {
       return [
         {'item': 'Consultation & Diagnosis', 'price': 'Rm50'},
@@ -360,7 +385,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                             child: ElevatedButton(
                               onPressed: _handleConfirm,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
+                                backgroundColor: const Color(0xFFFBC02D),
                                 foregroundColor: Colors.black,
                                 elevation: 2,
                                 shape: RoundedRectangleBorder(

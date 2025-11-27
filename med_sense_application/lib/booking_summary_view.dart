@@ -238,6 +238,7 @@ class BookingSummaryView extends StatelessWidget {
                                 builder: (context) => BookingDateTimeView(
                                   serviceName: serviceTitle,
                                   servicePrice: price,
+                                  description: description, // Pass full description
                                 ),
                               ),
                             );

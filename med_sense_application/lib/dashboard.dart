@@ -68,17 +68,30 @@ class _DashboardPageState extends State<DashboardPage> {
 
       for (var item in response) {
         final String name = item['service_name'] as String;
-        final String rawDesc = item['description'] as String? ?? '';
+        final String rawDescription = item['description'] as String? ?? '';
         final int duration = item['estimated_duration_minutes'] as int? ?? 0;
         
-        // Parse price line from description (e.g. "Price: RM 100")
+        String descriptionText = rawDescription;
         String priceText = "Price upon consultation";
-        final lines = rawDesc.split('\n');
+
+        final lines = rawDescription.split('\n');
+        List<String> descLines = [];
+        List<String> priceLines = [];
+
         for (var line in lines) {
-           if (line.trim().startsWith('Price:') || line.trim().startsWith('From RM') || line.trim().contains('RM')) {
-             priceText = line.trim();
-             break;
-           }
+          if (line.trim().isEmpty) continue;
+          if (line.contains('Price:') || line.contains('Deposit:') || line.contains('Monthly:') || line.contains('RM')) {
+             priceLines.add(line.trim());
+          } else {
+             descLines.add(line.trim());
+          }
+        }
+        
+        if (priceLines.isNotEmpty) {
+          priceText = priceLines.join('\n');
+        }
+        if (descLines.isNotEmpty) {
+          descriptionText = descLines.join(' ');
         }
 
         // Basic categorization logic based on keywords
@@ -98,6 +111,8 @@ class _DashboardPageState extends State<DashboardPage> {
             'title': name,
             'duration': 'Est. $duration mins',
             'price': priceText,
+            'raw_desc': descriptionText,
+            'full_desc': rawDescription,
           });
         }
       }

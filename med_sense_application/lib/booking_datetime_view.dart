@@ -6,11 +6,13 @@ import 'review_confirm_view.dart';
 class BookingDateTimeView extends StatefulWidget {
   final String serviceName;
   final String? servicePrice;
+  final String description; // Added to pass breakdown details
 
   const BookingDateTimeView({
     super.key,
     required this.serviceName,
     this.servicePrice,
+    required this.description,
   });
 
   @override
@@ -443,6 +445,7 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                               clinicAddress: selectedClinic['address'],
                               serviceName: widget.serviceName,
                               servicePrice: widget.servicePrice ?? "RM 0",
+                              description: widget.description, // Pass description
                               date: _selectedDate,
                               time: _selectedTime!,
                               doctorName: doctor['name']!, 
