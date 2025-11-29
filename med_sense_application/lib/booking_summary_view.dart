@@ -7,7 +7,7 @@ class BookingSummaryView extends StatelessWidget {
   final String serviceTitle;    
   final String price;           
   final String duration;        
-  final String description; // Added to parse details from
+  final String description; // Used for context or breakdown if present
 
   const BookingSummaryView({
     super.key,
@@ -15,7 +15,7 @@ class BookingSummaryView extends StatelessWidget {
     required this.serviceTitle,
     required this.price,
     required this.duration,
-    required this.description, // Receive full description
+    required this.description,
   });
 
   void _handleBack(BuildContext context) {
@@ -31,18 +31,14 @@ class BookingSummaryView extends StatelessWidget {
 
   // Helper to parse the description from DB into a breakdown list
   List<Map<String, String>> _getBreakdown() {
-    // If the description has explicit price lines (e.g. "Deposit: RM 500"), use them.
-    // Otherwise, use standard defaults based on category/name.
-    
     List<Map<String, String>> items = [];
     
-    // 1. Try to parse explicit lines from DB description
+    // 1. Try to parse explicit lines from DB description if they still exist (for compatibility)
     final lines = description.split('\n');
     for (var line in lines) {
       line = line.trim();
       if (line.isEmpty) continue;
       
-      // If line contains price indicators
       if (line.startsWith('Price:') || line.startsWith('Deposit:') || line.startsWith('Monthly:')) {
         final parts = line.split(':');
         if (parts.length >= 2) {
@@ -54,27 +50,27 @@ class BookingSummaryView extends StatelessWidget {
       }
     }
 
-    // 2. If no specific price lines found, fall back to generic breakdown logic
+    // 2. Fall back to standard breakdown if explicit items aren't found in text
     if (items.isEmpty) {
       if (serviceTitle.contains("Scaling")) {
         items = [
           {'item': 'Consultation & Diagnosis', 'price': 'RM 50'},
-          {'item': 'Procedure Fee', 'price': price}, // Use the passed total price
+          {'item': 'Procedure Fee', 'price': price}, // Use actual DB price
         ];
       } else if (serviceTitle.contains("Braces")) {
         items = [
           {'item': 'Consultation & X-ray', 'price': 'RM 200'},
-          {'item': 'Braces Deposit/Fee', 'price': price},
+          {'item': 'Braces Deposit/Fee', 'price': price}, // Use actual DB price
         ];
       } else if (serviceTitle.contains("Whitening")) {
         items = [
           {'item': 'Dental Assessment', 'price': 'RM 50'},
-          {'item': 'Whitening Kit/Procedure', 'price': price},
+          {'item': 'Whitening Kit/Procedure', 'price': price}, // Use actual DB price
         ];
       } else {
         items = [
           {'item': 'Consultation', 'price': 'RM 50'},
-          {'item': 'Procedure', 'price': price},
+          {'item': 'Procedure', 'price': price}, // Use actual DB price
         ];
       }
     }
@@ -238,7 +234,7 @@ class BookingSummaryView extends StatelessWidget {
                                 builder: (context) => BookingDateTimeView(
                                   serviceName: serviceTitle,
                                   servicePrice: price,
-                                  description: description, // Pass full description
+                                  description: description,
                                 ),
                               ),
                             );

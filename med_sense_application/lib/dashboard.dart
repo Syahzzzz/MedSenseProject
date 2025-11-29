@@ -53,10 +53,10 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() => _isServicesLoading = true);
     
     try {
-      // Fetch services from DB
+      // Fetch services from DB, now including the 'price' column
       final List<dynamic> response = await _supabase
           .from('Service') 
-          .select('service_name, description, estimated_duration_minutes')
+          .select('service_name, description, estimated_duration_minutes, price')
           .order('service_name', ascending: true);
 
       final Map<String, List<Map<String, String>>> categorized = {
@@ -70,29 +70,13 @@ class _DashboardPageState extends State<DashboardPage> {
         final String name = item['service_name'] as String;
         final String rawDescription = item['description'] as String? ?? '';
         final int duration = item['estimated_duration_minutes'] as int? ?? 0;
+        final num priceVal = item['price'] as num? ?? 0;
         
+        // Format price
+        String priceText = "RM ${priceVal.toStringAsFixed(0)}"; 
+        
+        // Use description directly as it likely no longer contains price metadata
         String descriptionText = rawDescription;
-        String priceText = "Price upon consultation";
-
-        final lines = rawDescription.split('\n');
-        List<String> descLines = [];
-        List<String> priceLines = [];
-
-        for (var line in lines) {
-          if (line.trim().isEmpty) continue;
-          if (line.contains('Price:') || line.contains('Deposit:') || line.contains('Monthly:') || line.contains('RM')) {
-             priceLines.add(line.trim());
-          } else {
-             descLines.add(line.trim());
-          }
-        }
-        
-        if (priceLines.isNotEmpty) {
-          priceText = priceLines.join('\n');
-        }
-        if (descLines.isNotEmpty) {
-          descriptionText = descLines.join(' ');
-        }
 
         // Basic categorization logic based on keywords
         String category = 'Other';
@@ -142,9 +126,6 @@ class _DashboardPageState extends State<DashboardPage> {
   void _loadUserProfile() {
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      // Try to get from DB Patient table first if possible, or fallback to metadata
-      // For simplicity here we use metadata + local state update like fetching profile
-      // Ideally fetch from 'Patient' table similar to ProfileView
       setState(() {
         _userName = user.userMetadata?['full_name'] ?? "User";
         String? url = user.userMetadata?['avatar_url'];

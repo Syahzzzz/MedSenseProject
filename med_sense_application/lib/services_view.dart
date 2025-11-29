@@ -30,10 +30,10 @@ class _ServicesViewState extends State<ServicesView> {
     try {
       final supabase = Supabase.instance.client;
       
-      // Fetch all services from the public."Service" table
+      // Fetch all services from the public."Service" table, including the new 'price' column
       final List<dynamic> response = await supabase
           .from('Service') 
-          .select('service_name, description, estimated_duration_minutes')
+          .select('service_name, description, estimated_duration_minutes, price')
           .order('service_name', ascending: true);
 
       final Map<String, List<Map<String, String>>> categorizedServices = {
@@ -47,29 +47,13 @@ class _ServicesViewState extends State<ServicesView> {
         final String name = item['service_name'] as String;
         final String rawDescription = item['description'] as String? ?? '';
         final int duration = item['estimated_duration_minutes'] as int? ?? 0;
+        final num priceVal = item['price'] as num? ?? 0;
         
+        // Format the numeric price from the database
+        String priceText = "RM ${priceVal.toStringAsFixed(0)}";
+        
+        // Use raw description directly
         String descriptionText = rawDescription;
-        String priceText = "Price upon consultation";
-
-        final lines = rawDescription.split('\n');
-        List<String> descLines = [];
-        List<String> priceLines = [];
-
-        for (var line in lines) {
-          if (line.trim().isEmpty) continue;
-          if (line.contains('Price:') || line.contains('Deposit:') || line.contains('Monthly:') || line.contains('RM')) {
-             priceLines.add(line.trim());
-          } else {
-             descLines.add(line.trim());
-          }
-        }
-        
-        if (priceLines.isNotEmpty) {
-          priceText = priceLines.join('\n');
-        }
-        if (descLines.isNotEmpty) {
-          descriptionText = descLines.join(' ');
-        }
 
         String category = 'Other';
         if (name.contains('Braces') || name.contains('Invisalign') || name.contains('Retainer Bond')) {
@@ -88,7 +72,7 @@ class _ServicesViewState extends State<ServicesView> {
             'duration': 'Est. $duration mins',
             'price': priceText,
             'raw_desc': descriptionText,
-            'full_desc': rawDescription, // Pass full description for parsing in Summary view
+            'full_desc': rawDescription, // Pass full description for context if needed
           });
         }
       }
@@ -270,7 +254,7 @@ class _ServicesViewState extends State<ServicesView> {
                                                 serviceTitle: service['title']!,
                                                 price: service['price']!,
                                                 duration: service['duration']!,
-                                                description: service['full_desc']!, // Passing full description for proper breakdown parsing
+                                                description: service['full_desc']!, 
                                               ),
                                             ),
                                           );

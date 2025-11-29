@@ -17,7 +17,7 @@ class _SignupPageState extends State<SignupPage> {
   // Android Emulator: 'http://10.0.2.2:8000/signup'
   // iOS Simulator: 'http://127.0.0.1:8000/signup'
   // Real Device: 'http://YOUR_LOCAL_IP:8000/signup'
-  final String _apiUrl = 'http://10.94.138.56:8000/signup';
+  final String _apiUrl = 'http://10.94.138.179:8000/signup';
 
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();

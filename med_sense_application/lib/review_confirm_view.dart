@@ -7,10 +7,10 @@ class ReviewConfirmView extends StatefulWidget {
   final String clinicAddress;
   final String serviceName;
   final String servicePrice;
-  final String description; // Added parameter
+  final String description; 
   final DateTime date;
   final String time;
-  final String doctorName; // NEW Parameter
+  final String doctorName; 
 
   const ReviewConfirmView({
     super.key,
@@ -18,10 +18,10 @@ class ReviewConfirmView extends StatefulWidget {
     required this.clinicAddress,
     required this.serviceName,
     required this.servicePrice,
-    required this.description, // Required
+    required this.description, 
     required this.date,
     required this.time,
-    required this.doctorName, // Required
+    required this.doctorName, 
   });
 
   @override
@@ -36,7 +36,6 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
   @override
   void initState() {
     super.initState();
-    // Removed _loadUserName() as we now use the passed doctor name
   }
 
   void _handleConfirm() {
@@ -59,7 +58,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
 
   // --- Helper to get breakdown items based on service name ---
   List<Map<String, String>> _getBreakdown(String serviceName) {
-    // 1. Try to parse explicit lines from DB description (passed as widget.description)
+    // 1. Try to parse explicit lines from description if they exist (backward compatibility)
     List<Map<String, String>> items = [];
     final lines = widget.description.split('\n');
     
@@ -83,49 +82,48 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
       return items;
     }
 
-    // Logic copied/adapted from BookingSummaryView to match details if parsing fails
+    // 2. Fall back to using the passed 'servicePrice' (which comes from DB) in standard templates
     if (serviceName.contains("Scaling")) {
       return [
-        {'item': 'Consultation & Diagnosis', 'price': 'Rm50'},
-        {'item': 'Procedure Fee', 'price': 'Rm100 - Rm300'},
-        {'item': 'Medication (if applicable)', 'price': 'Rm30'},
+        {'item': 'Consultation & Diagnosis', 'price': 'RM 50'},
+        {'item': 'Procedure Fee', 'price': widget.servicePrice}, // Use DB price
+        {'item': 'Medication (if applicable)', 'price': 'RM 30'},
         {'item': 'Follow-up appointment', 'price': 'Free'},
       ];
     }
     // Braces logic
     if (serviceName.contains("Metal") || serviceName.contains("Ceramic") || serviceName.contains("Braces")) {
       return [
-        {'item': 'Braces consultation\nXray\nMoulding', 'price': 'Rm200'},
-        {'item': 'Scaling & polishing\nUpper braces', 'price': 'Rm499\n(Deposit)'},
-        {'item': 'Lower braces\nMonthly payment', 'price': 'Rm150'},
-        {'item': 'Extraction/filling (if needed)', 'price': 'Rm120'},
-        {'item': 'Braces removal and retainer', 'price': 'Rm700'},
-        {'item': 'Bond bracket (per bracket)', 'price': 'Rm60'},
+        {'item': 'Braces consultation\nXray\nMoulding', 'price': 'RM 200'},
+        {'item': 'Scaling & polishing\nUpper braces', 'price': widget.servicePrice}, // Use DB price
+        {'item': 'Lower braces\nMonthly payment', 'price': 'RM 150'},
+        {'item': 'Extraction/filling (if needed)', 'price': 'RM 120'},
+        {'item': 'Braces removal and retainer', 'price': 'RM 700'},
+        {'item': 'Bond bracket (per bracket)', 'price': 'RM 60'},
       ];
     }
     // Whitening logic
     if (serviceName.contains("Whitening")) {
       return [
-        {'item': 'Dental Assessment', 'price': 'Rm50'},
-        {'item': 'Whitening Procedure', 'price': 'Rm800'},
-        {'item': 'Take-home Kit', 'price': 'Rm150'},
+        {'item': 'Dental Assessment', 'price': 'RM 50'},
+        {'item': 'Whitening Procedure', 'price': widget.servicePrice}, // Use DB price
+        {'item': 'Take-home Kit', 'price': 'RM 150'},
         {'item': 'Desensitizing Gel', 'price': 'Free'},
       ];
     }
     // Default fallback
     return [
-      {'item': 'Consultation', 'price': 'Rm50'},
-      {'item': 'Procedure', 'price': 'TBD'},
+      {'item': 'Consultation', 'price': 'RM 50'},
+      {'item': 'Procedure', 'price': widget.servicePrice}, // Use DB price
     ];
   }
 
   @override
   Widget build(BuildContext context) {
     final String displayDate = "${widget.date.day}/${widget.date.month}/${widget.date.year}";
-    // Extract clean price string (e.g., "Rm 699")
-    String cleanPrice = widget.servicePrice.replaceAll(RegExp(r'[^0-9]'), '');
-    if (cleanPrice.isEmpty) cleanPrice = "0";
-    final String priceDisplay = "Rm $cleanPrice";
+    
+    // Use the passed service price directly
+    final String priceDisplay = widget.servicePrice;
 
     final List<Map<String, String>> breakdown = _getBreakdown(widget.serviceName);
 
@@ -247,7 +245,6 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      // UPDATED: Shows selected doctor
                                       "${AppTranslations.get('with')} ${widget.doctorName.toUpperCase()}",
                                       style: TextStyle(color: Colors.grey[600], fontSize: 14),
                                     ),
@@ -334,7 +331,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(AppTranslations.get('pay_at_venue'), style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-                              Text("Rm 0", style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                              Text("RM 0", style: TextStyle(color: Colors.grey[600], fontSize: 14)),
                             ],
                           ),
 
