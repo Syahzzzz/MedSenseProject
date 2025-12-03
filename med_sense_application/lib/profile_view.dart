@@ -7,6 +7,7 @@ import 'edit_profile_view.dart';
 import 'change_password_view.dart';
 import 'translations.dart';
 import 'language_selector_widget.dart';
+import 'add_card_view.dart'; 
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -266,9 +267,6 @@ class _ProfileViewState extends State<ProfileView> {
     await prefs.remove('remember_me_password');
     await prefs.setBool('remember_me_status', false);
     
-    // Or clear everything if that is preferred
-    // await prefs.clear(); 
-
     await _supabase.auth.signOut();
 
     if (mounted) {
@@ -361,6 +359,18 @@ class _ProfileViewState extends State<ProfileView> {
               },
             ),
 
+            // --- NEW: Payment Methods Menu Item ---
+            _buildMenuTile(
+              icon: Icons.payment,
+              title: AppTranslations.get('payment_methods'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddCardView()),
+                );
+              },
+            ),
+
             const Divider(height: 30),
 
             SwitchListTile(
@@ -383,7 +393,7 @@ class _ProfileViewState extends State<ProfileView> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: _showLogoutConfirmation, // Updated to show dialog
+                onPressed: _showLogoutConfirmation, 
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red[50],
                   foregroundColor: Colors.red,

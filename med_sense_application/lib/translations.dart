@@ -142,6 +142,17 @@ class AppTranslations {
       'reenter_new_pass': 'Re-enter new password',
       'select_birthday': 'Select Birthday',
 
+      // --- Payment / Cards ---
+      'payment_methods': 'Payment Methods',
+      'add_new_card': 'Add New Card',
+      'card_number': 'Card Number',
+      'expiry_date': 'Expiry Date (MM/YY)',
+      'cvv': 'CVV',
+      'cardholder_name': 'Cardholder Name',
+      'save_card': 'Save Card',
+      'card_saved_msg': 'Card saved successfully!',
+      'invalid_form': 'Please check your card details',
+
       // --- Review & Confirm ---
       'review_confirm': 'Review and confirm',
       'with': 'with',
@@ -286,6 +297,17 @@ class AppTranslations {
       'reenter_new_pass': 'Masukkan semula kata laluan baru',
       'select_birthday': 'Pilih Hari Jadi',
 
+      // --- Payment / Cards ---
+      'payment_methods': 'Kaedah Pembayaran',
+      'add_new_card': 'Tambah Kad Baru',
+      'card_number': 'Nombor Kad',
+      'expiry_date': 'Tarikh Luput (BB/TT)',
+      'cvv': 'CVV',
+      'cardholder_name': 'Nama Pemegang Kad',
+      'save_card': 'Simpan Kad',
+      'card_saved_msg': 'Kad berjaya disimpan!',
+      'invalid_form': 'Sila semak maklumat kad anda',
+
       // --- Review & Confirm ---
       'review_confirm': 'Semak dan Sahkan',
       'with': 'bersama',
@@ -429,6 +451,17 @@ class AppTranslations {
       'enter_new_pass': '输入新密码',
       'reenter_new_pass': '重新输入新密码',
       'select_birthday': '选择生日',
+
+      // --- Payment / Cards ---
+      'payment_methods': '支付方式',
+      'add_new_card': '添加新卡',
+      'card_number': '卡号',
+      'expiry_date': '有效期 (月/年)',
+      'cvv': 'CVV',
+      'cardholder_name': '持卡人姓名',
+      'save_card': '保存卡片',
+      'card_saved_msg': '卡片保存成功！',
+      'invalid_form': '请检查您的卡片信息',
 
       // --- Review & Confirm ---
       'review_confirm': '审查并确认',
