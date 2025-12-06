@@ -17,7 +17,7 @@ class _SignupPageState extends State<SignupPage> {
   // Android Emulator: 'http://10.0.2.2:8000/signup'
   // iOS Simulator: 'http://127.0.0.1:8000/signup'
   // Real Device: 'http://YOUR_LOCAL_IP:8000/signup'
-  final String _apiUrl = 'http://192.168.0.17:8000/signup';
+  final String _apiUrl = 'http://10.0.2.2:8000/signup';
 
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -149,7 +149,25 @@ class _SignupPageState extends State<SignupPage> {
       _showError("Please select your date of birth");
       return;
     }
-    if (_passwordController.text != _confirmPasswordController.text) {
+
+    // --- NEW PASSWORD VALIDATION ---
+    final String password = _passwordController.text;
+    
+    // 1. Check Minimum Length
+    if (password.length < 6) {
+      _showError("Password must be at least 6 characters long");
+      return;
+    }
+
+    // 2. Check for Special Character
+    // The Regex checks for any character that is NOT a word char or whitespace, or standard special chars
+    if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
+      _showError("Password must contain at least one special character (e.g. !@#\$%^&*)");
+      return;
+    }
+    // -------------------------------
+
+    if (password != _confirmPasswordController.text) {
       _showError("Passwords do not match");
       return;
     }
@@ -167,7 +185,7 @@ class _SignupPageState extends State<SignupPage> {
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
         'dob': _dobController.text.trim(),
-        'password': _passwordController.text.trim(),
+        'password': password.trim(),
         'is_oku': _isOku,
       };
 
@@ -264,13 +282,13 @@ class _SignupPageState extends State<SignupPage> {
                     Text(AppTranslations.get('start_journey_subtitle'), style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                     const SizedBox(height: 30),
 
-                    _buildCustomTextField(_fullNameController, AppTranslations.get('Full name'), false),
+                    _buildCustomTextField(_fullNameController, AppTranslations.get('Full name'), false, icon: Icons.person_outline),
                     const SizedBox(height: 15),
 
-                    _buildCustomTextField(_emailController, AppTranslations.get('email'), false),
+                    _buildCustomTextField(_emailController, AppTranslations.get('email'), false, icon: Icons.email_outlined),
                     const SizedBox(height: 15),
 
-                    _buildCustomTextField(_phoneController, AppTranslations.get('phone_number'), false, keyboardType: TextInputType.phone),
+                    _buildCustomTextField(_phoneController, AppTranslations.get('phone_number'), false, keyboardType: TextInputType.phone, icon: Icons.phone_outlined),
                     const SizedBox(height: 15),
 
                     GestureDetector(
@@ -415,8 +433,8 @@ class _SignupPageState extends State<SignupPage> {
           prefixIcon: isPassword
               ? const SizedBox(width: 48, height: 48) // Standard IconButton size balance
               : (icon != null 
-                  ? const SizedBox(width: 48, height: 48) // Approx balance for Icon in suffix
-                  : null),
+                  ? Icon(icon, color: Colors.grey)
+                  : const SizedBox(width: 48, height: 48)), // Ensure balance even if no icon passed, though current usages pass icons
 
           suffixIcon: isPassword
             ? IconButton(
@@ -426,7 +444,7 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 onPressed: onEyePressed,
               )
-            : (icon != null ? Icon(icon, color: Colors.grey) : null),
+            : (icon != null ? const SizedBox(width: 48, height: 48) : null), // Balance non-password fields
         ),
       ),
     );

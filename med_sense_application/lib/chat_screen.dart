@@ -84,8 +84,8 @@ Future<void> _sendMessage() async {
                         Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
                         SizedBox(height: 16),
                         Text("Ask about queue status,\nOKU priority, or dental care!", 
-                             textAlign: TextAlign.center,
-                             style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600])),
                       ],
                     ),
                   )

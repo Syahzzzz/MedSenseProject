@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase to get user info
 import 'translations.dart';
 
 class AddCardView extends StatefulWidget {
@@ -40,30 +41,45 @@ class _AddCardViewState extends State<AddCardView> {
     super.dispose();
   }
 
-  // --- Load saved card details from SharedPreferences ---
+  // Helper to get the current user's email to use as a key suffix
+  String _getUserKeySuffix() {
+    final user = Supabase.instance.client.auth.currentUser;
+    return user?.email ?? ''; 
+  }
+
+  // --- Load saved card details specific to the logged-in user ---
   Future<void> _loadSavedCard() async {
     final prefs = await SharedPreferences.getInstance();
+    final suffix = _getUserKeySuffix();
+
+    // If no user is logged in (suffix empty), simply don't load anything
+    if (suffix.isEmpty) return;
+
     if (mounted) {
       setState(() {
-        _cardNumberController.text = prefs.getString('card_number') ?? '';
-        _expiryController.text = prefs.getString('card_expiry') ?? '';
-        _cvvController.text = prefs.getString('card_cvv') ?? '';
-        _nameController.text = prefs.getString('card_holder_name') ?? '';
+        _cardNumberController.text = prefs.getString('card_number_$suffix') ?? '';
+        _expiryController.text = prefs.getString('card_expiry_$suffix') ?? '';
+        _cvvController.text = prefs.getString('card_cvv_$suffix') ?? '';
+        _nameController.text = prefs.getString('card_holder_name_$suffix') ?? '';
       });
     }
   }
 
-  // --- Save card details to SharedPreferences ---
+  // --- Save card details specific to the logged-in user ---
   Future<void> _handleSave() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // Save to local device storage
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('card_number', _cardNumberController.text);
-      await prefs.setString('card_expiry', _expiryController.text);
-      await prefs.setString('card_cvv', _cvvController.text);
-      await prefs.setString('card_holder_name', _nameController.text);
+      final suffix = _getUserKeySuffix();
+
+      if (suffix.isNotEmpty) {
+        // Save to local device storage with user-specific keys
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('card_number_$suffix', _cardNumberController.text);
+        await prefs.setString('card_expiry_$suffix', _expiryController.text);
+        await prefs.setString('card_cvv_$suffix', _cvvController.text);
+        await prefs.setString('card_holder_name_$suffix', _nameController.text);
+      }
 
       // Simulate a brief network/processing delay for better UX
       await Future.delayed(const Duration(seconds: 1));
