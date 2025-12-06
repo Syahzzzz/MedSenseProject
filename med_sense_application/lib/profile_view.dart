@@ -8,6 +8,7 @@ import 'change_password_view.dart';
 import 'translations.dart';
 import 'language_selector_widget.dart';
 import 'add_card_view.dart'; 
+import 'tts_manager.dart'; // Import TTS Manager
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -19,19 +20,23 @@ class ProfileView extends StatefulWidget {
 class _ProfileViewState extends State<ProfileView> {
   // --- State Variables ---
   final _supabase = Supabase.instance.client;
+  final TtsManager _tts = TtsManager(); // Initialize TTS
+  
   String _userName = "User";
   String _email = "";
   String? _avatarUrl;
   String _patientId = "--------"; 
   bool _notificationsEnabled = false;
-  bool _isOkuEnabled = false; // New state for OKU toggle
+  bool _isOkuEnabled = false; // OKU toggle state
+  bool _isQuickPinEnabled = false; // Quick PIN toggle state
 
   // --- Lifecycle ---
   @override
   void initState() {
     super.initState();
+    _tts.init(); // Initialize TTS engine
     _loadUserProfile();
-    _loadLocalSettings(); // Load notifications and OKU status
+    _loadLocalSettings(); 
   }
 
   // --- Data Loading ---
@@ -67,9 +72,6 @@ class _ProfileViewState extends State<ProfileView> {
               } else {
                 _patientId = rawId;
               }
-              
-              // Load initial OKU status from DB if needed, though local preference overrides for toggle
-              // bool dbOku = data['is_oku'] ?? false;
             } else {
               _userName = user.userMetadata?['full_name'] ?? "User";
               if (user.id.length >= 8) {
@@ -87,19 +89,26 @@ class _ProfileViewState extends State<ProfileView> {
   Future<void> _loadLocalSettings() async {
     final status = await Permission.notification.status;
     final prefs = await SharedPreferences.getInstance();
-    // Load OKU status, defaulting to false if not set
+    
+    // Load local preferences
     final okuStatus = prefs.getBool('is_oku_enabled') ?? false;
+    final pinStatus = prefs.getBool('quick_pin_enabled') ?? false;
 
     if (mounted) {
       setState(() {
         _notificationsEnabled = status.isGranted;
         _isOkuEnabled = okuStatus;
+        _isQuickPinEnabled = pinStatus;
       });
+      _tts.setEnabled(_isOkuEnabled); // Sync TTS state
     }
   }
 
   // --- Actions ---
   Future<void> _toggleNotifications(bool value) async {
+    // Speak action
+    _tts.speak(value ? "Notifications enabled" : "Notifications disabled");
+
     if (value) {
       final status = await Permission.notification.request();
       if (!mounted) return;
@@ -120,12 +129,10 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  // --- New OKU Toggle Action ---
   Future<void> _toggleOku(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_oku_enabled', value); // Save preference
+    await prefs.setBool('is_oku_enabled', value);
     
-    // Optional: Sync this change back to Supabase 'Patient' table if you want it to be persistent across devices
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
@@ -138,6 +145,45 @@ class _ProfileViewState extends State<ProfileView> {
     setState(() {
       _isOkuEnabled = value;
     });
+    
+    // Update TTS Manager state immediately
+    _tts.setEnabled(value);
+    _tts.speak(value ? "OKU Mode Enabled. Text to speech active." : "OKU Mode Disabled");
+  }
+
+  Future<void> _toggleQuickPin(bool value) async {
+    _tts.speak(value ? "Quick PIN enabled" : "Quick PIN disabled");
+
+    final prefs = await SharedPreferences.getInstance();
+    final user = _supabase.auth.currentUser;
+
+    if (value && user != null) {
+      final savedPin = prefs.getString('quick_pin_${user.id}');
+      if (savedPin == null || savedPin.isEmpty) {
+        if (mounted) {
+          _tts.speak("No PIN set. Please set up a PIN in Security settings first.");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("No PIN set. Please set up a PIN in Security settings first."),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    await prefs.setBool('quick_pin_enabled', value);
+    setState(() {
+      _isQuickPinEnabled = value;
+    });
+  }
+
+  // --- TTS Helper ---
+  void _speakText(String text) {
+    if (_isOkuEnabled) {
+      _tts.speak(text);
+    }
   }
 
   void _showSettingsDialog() {
@@ -164,6 +210,7 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   void _showTermsAndConditions() {
+    _speakText("Opening Terms and Conditions");
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -204,32 +251,36 @@ class _ProfileViewState extends State<ProfileView> {
   Widget _buildTermPoint(String title, String content) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold, 
-              fontSize: 15,
-              color: Colors.black87,
+      child: GestureDetector( // Make terms tappable for reading
+        onTap: () => _speakText("$title. $content"),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold, 
+                fontSize: 15,
+                color: Colors.black87,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            content,
-            style: TextStyle(
-              fontSize: 13, 
-              color: Colors.grey[700],
-              height: 1.4, 
+            const SizedBox(height: 6),
+            Text(
+              content,
+              style: TextStyle(
+                fontSize: 13, 
+                color: Colors.grey[700],
+                height: 1.4, 
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   void _showLogoutConfirmation() {
+    _speakText("Are you sure you want to log out?");
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -308,50 +359,56 @@ class _ProfileViewState extends State<ProfileView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              AppTranslations.get('profile_title'),
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            GestureDetector(
+              onTap: () => _speakText(AppTranslations.get('profile_title')),
+              child: Text(
+                AppTranslations.get('profile_title'),
+                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 30),
 
             // Profile Header
             Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: const Color(0xFFFBC02D),
-                    backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
-                        ? NetworkImage(_avatarUrl!)
-                        : null,
-                    child: _avatarUrl == null || _avatarUrl!.isEmpty
-                        ? const Icon(Icons.person, size: 50, color: Colors.white)
-                        : null,
-                  ),
-                  const SizedBox(height: 15),
-                  
-                  Text(
-                    _userName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  
-                  Text(
-                    _email,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  // Patient ID Canvas
-                  SizedBox(
-                    width: 200, 
-                    height: 36,
-                    child: CustomPaint(
-                      painter: PatientIdPainter(patientId: _patientId),
+              child: GestureDetector(
+                onTap: () => _speakText("Profile for $_userName. Email: $_email"),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: const Color(0xFFFBC02D),
+                      backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                          ? NetworkImage(_avatarUrl!)
+                          : null,
+                      child: _avatarUrl == null || _avatarUrl!.isEmpty
+                          ? const Icon(Icons.person, size: 50, color: Colors.white)
+                          : null,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 15),
+                    
+                    Text(
+                      _userName,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    
+                    Text(
+                      _email,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    // Patient ID Canvas
+                    SizedBox(
+                      width: 200, 
+                      height: 36,
+                      child: CustomPaint(
+                        painter: PatientIdPainter(patientId: _patientId),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -361,6 +418,7 @@ class _ProfileViewState extends State<ProfileView> {
               icon: Icons.person_outline,
               title: AppTranslations.get('personal_info'),
               onTap: () async {
+                _speakText("Opening Personal Information");
                 await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const EditProfileView()),
@@ -373,6 +431,7 @@ class _ProfileViewState extends State<ProfileView> {
               icon: Icons.lock_outline,
               title: AppTranslations.get('security'),
               onTap: () {
+                _speakText("Opening Security Settings");
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ChangePasswordView()),
@@ -385,6 +444,7 @@ class _ProfileViewState extends State<ProfileView> {
               icon: Icons.payment,
               title: AppTranslations.get('payment_methods'),
               onTap: () {
+                _speakText("Opening Payment Methods");
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AddCardView()),
@@ -394,13 +454,16 @@ class _ProfileViewState extends State<ProfileView> {
 
             const Divider(height: 30),
 
-            // --- NEW OKU Toggle (Above Notifications) ---
+            // --- OKU Toggle ---
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               activeTrackColor: const Color(0xFFFBC02D),
-              title: Text(
-                AppTranslations.get('oku_feature'),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              title: GestureDetector(
+                onTap: () => _speakText("OKU Feature. Toggle to enable accessibility features."),
+                child: Text(
+                  AppTranslations.get('oku_feature'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
               subtitle: Text(
                 "Enable accessibility features",
@@ -410,12 +473,34 @@ class _ProfileViewState extends State<ProfileView> {
               onChanged: _toggleOku,
             ),
 
+            // --- Quick PIN Toggle (New) ---
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               activeTrackColor: const Color(0xFFFBC02D),
-              title: Text(
-                AppTranslations.get('notifications'),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              title: GestureDetector(
+                onTap: () => _speakText("Quick PIN. Toggle to enable quick login with PIN."),
+                child: Text(
+                  AppTranslations.get('tab_pin'), 
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              subtitle: Text(
+                "Enable quick login with PIN",
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              value: _isQuickPinEnabled,
+              onChanged: _toggleQuickPin,
+            ),
+
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              activeTrackColor: const Color(0xFFFBC02D),
+              title: GestureDetector(
+                onTap: () => _speakText("Notifications. Toggle to receive updates."),
+                child: Text(
+                  AppTranslations.get('notifications'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
               value: _notificationsEnabled,
               onChanged: _toggleNotifications,
@@ -462,6 +547,19 @@ class _ProfileViewState extends State<ProfileView> {
                     decoration: TextDecoration.underline,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: GestureDetector(
+                onTap: () => _speakText("Version 1.0.0"),
+                child: Text(
+                  "Version 1.0.0",
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 12,
                   ),
                 ),
               ),

@@ -61,7 +61,7 @@ class AppTranslations {
       'tc_6_content': 'Prices listed for services (e.g., Braces, Scaling) are estimates. Final pricing is determined by the clinic based on the actual treatment required.',
 
       // --- Dashboard ---
-      'hello': 'Hello ',
+      'hello': 'Hello, ',
       'upcoming': 'Upcoming',
       'services': 'Services',
       'services_title': 'Services',
@@ -236,7 +236,7 @@ class AppTranslations {
       'tc_6_content': 'Harga yang disenaraikan untuk perkhidmatan (cth., Pendakap, Cuci Gigi) adalah anggaran. Harga akhir ditentukan oleh klinik berdasarkan rawatan sebenar yang diperlukan.',
 
       // --- Dashboard ---
-      'hello': 'Helo ',
+      'hello': 'Helo, ',
       'upcoming': 'Akan Datang',
       'services': 'Perkhidmatan',
       'services_title': 'Perkhidmatan',
@@ -410,7 +410,7 @@ class AppTranslations {
       'tc_6_content': '列出的服务价格（例如牙套、洗牙）仅为估算值。最终价格由诊所根据实际需要的治疗确定。',
 
       // --- Dashboard ---
-      'hello': '你好 ',
+      'hello': '你好, ',
       'upcoming': '即将到来',
       'services': '服务',
       'services_title': '服务',

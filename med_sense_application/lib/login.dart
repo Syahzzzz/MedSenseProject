@@ -23,7 +23,7 @@ class _LoginPageState extends State<LoginPage> {
   
   // --- State Variables ---
   bool _rememberMe = false;
-  bool _obscurePassword = true; // Controls the eye icon
+  bool _obscurePassword = true; 
 
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
@@ -36,7 +36,7 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // --- Load Credentials (Don't Auto Login) ---
+  // --- Load Credentials & Check for PIN ---
   Future<void> _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     final rememberStatus = prefs.getBool('remember_me_status') ?? false;
@@ -44,6 +44,8 @@ class _LoginPageState extends State<LoginPage> {
     if (rememberStatus) {
       final savedEmail = prefs.getString('remember_me_email');
       final savedPassword = prefs.getString('remember_me_password');
+      final savedUid = prefs.getString('remember_me_uid');
+      final bool pinEnabled = prefs.getBool('quick_pin_enabled') ?? false;
 
       if (savedEmail != null && savedPassword != null) {
         setState(() {
@@ -51,6 +53,15 @@ class _LoginPageState extends State<LoginPage> {
           _passwordController.text = savedPassword;
           _rememberMe = true;
         });
+
+        // --- PIN CHECK ---
+        if (pinEnabled && savedUid != null) {
+          final String? storedPin = prefs.getString('quick_pin_$savedUid');
+          if (storedPin != null && storedPin.isNotEmpty && mounted) {
+            // Show PIN Dialog immediately
+            _showPinDialog(storedPin, savedEmail, savedPassword);
+          }
+        }
       }
     }
   }
@@ -75,25 +86,27 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
-      // --- Save/Remove Credentials ---
-      final prefs = await SharedPreferences.getInstance();
-      if (_rememberMe) {
-        await prefs.setString('remember_me_email', _emailController.text.trim());
-        await prefs.setString('remember_me_password', _passwordController.text.trim());
-        await prefs.setBool('remember_me_status', true);
-      } else {
-        await prefs.remove('remember_me_email');
-        await prefs.remove('remember_me_password');
-        await prefs.setBool('remember_me_status', false);
-      }
-
       final AuthResponse response = await _supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // --- LOGIC UPDATED: User-Specific Onboarding Check ---
       final user = response.user;
+      
+      // --- Save/Remove Credentials (Moved after successful login) ---
+      final prefs = await SharedPreferences.getInstance();
+      if (_rememberMe && user != null) {
+        await prefs.setString('remember_me_email', _emailController.text.trim());
+        await prefs.setString('remember_me_password', _passwordController.text.trim());
+        await prefs.setString('remember_me_uid', user.id); // Save UID for PIN retrieval
+        await prefs.setBool('remember_me_status', true);
+      } else {
+        await prefs.remove('remember_me_email');
+        await prefs.remove('remember_me_password');
+        await prefs.remove('remember_me_uid');
+        await prefs.setBool('remember_me_status', false);
+      }
+
       if (user != null) {
         final String onboardingKey = 'has_seen_onboarding_${user.id}';
         final bool hasSeenOnboarding = prefs.getBool(onboardingKey) ?? false;
@@ -115,7 +128,6 @@ class _LoginPageState extends State<LoginPage> {
       
     } on AuthException catch (e) {
       if (mounted) {
-        // Better error message handling
         String msg = e.message;
         if (msg.contains("Invalid login credentials")) {
           msg = "Invalid email or password. If you just signed up, please check your email to verify your account.";
@@ -135,6 +147,27 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  // --- Quick PIN Dialog Logic ---
+  void _showPinDialog(String correctPin, String email, String password) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false, // Prevent dismissing by tapping outside to enforce security logic
+      enableDrag: false,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) {
+        return _PinEntryWidget(
+          correctPin: correctPin,
+          onSuccess: () {
+            Navigator.pop(context); // Close dialog
+            _handleLogin(); // Trigger existing login flow which uses the pre-filled controllers
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -311,9 +344,8 @@ class _LoginPageState extends State<LoginPage> {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           
-          // --- FIX: Add invisible prefix to balance the suffix icon ---
           prefixIcon: isPassword
-              ? const SizedBox(width: 48, height: 48) // Standard icon button size
+              ? const SizedBox(width: 48, height: 48)
               : null,
 
           suffixIcon: isPassword 
@@ -326,6 +358,199 @@ class _LoginPageState extends State<LoginPage> {
               )
             : null,
         ),
+      ),
+    );
+  }
+}
+
+// --- Local Widget for PIN Entry inside Dialog ---
+class _PinEntryWidget extends StatefulWidget {
+  final String correctPin;
+  final VoidCallback onSuccess;
+
+  const _PinEntryWidget({required this.correctPin, required this.onSuccess});
+
+  @override
+  State<_PinEntryWidget> createState() => _PinEntryWidgetState();
+}
+
+class _PinEntryWidgetState extends State<_PinEntryWidget> {
+  String _enteredPin = "";
+  String _message = "Enter your Quick Access PIN";
+  Color _messageColor = Colors.grey;
+  
+  // --- Brute Force Protection State ---
+  int _failedAttempts = 0;
+  final int _maxAttempts = 5;
+  final int _warningThreshold = 2; // Show attempts left after 2 wrong tries
+
+  void _onDigitPress(String digit) {
+    if (_enteredPin.length < 6) {
+      setState(() {
+        _enteredPin += digit;
+        // Only reset message if we aren't already in warning mode
+        if (_failedAttempts < _warningThreshold) {
+          _message = "Enter your Quick Access PIN";
+          _messageColor = Colors.grey;
+        }
+      });
+
+      if (_enteredPin.length == 6) {
+        _validatePin();
+      }
+    }
+  }
+
+  void _validatePin() {
+    if (_enteredPin == widget.correctPin) {
+      widget.onSuccess();
+    } else {
+      _handleFailedAttempt();
+    }
+  }
+
+  void _handleFailedAttempt() {
+    setState(() {
+      _failedAttempts++;
+      _enteredPin = ""; // Clear input
+      
+      if (_failedAttempts >= _maxAttempts) {
+        // Too many attempts - Force password login
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Too many failed attempts. Please login with password."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      } else if (_failedAttempts >= _warningThreshold) {
+        // Show remaining attempts
+        int attemptsLeft = _maxAttempts - _failedAttempts;
+        _message = "Incorrect PIN. $attemptsLeft attempts remaining.";
+        _messageColor = Colors.red;
+      } else {
+        // Just incorrect
+        _message = "Incorrect PIN. Try again.";
+        _messageColor = Colors.red;
+      }
+    });
+  }
+
+  void _onDeletePress() {
+    if (_enteredPin.isNotEmpty) {
+      setState(() {
+        _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Standard size for number buttons to ensure alignment
+    const double buttonSize = 70.0;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+      child: Column(
+        children: [
+          Container(
+            width: 50,
+            height: 5,
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+          ),
+          const SizedBox(height: 40),
+          const Icon(Icons.lock_open_rounded, size: 50, color: Color(0xFFFBC02D)),
+          const SizedBox(height: 20),
+          Text(
+            AppTranslations.get('welcome_title'),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(_message, style: TextStyle(color: _messageColor, fontSize: 14, fontWeight: FontWeight.w500)),
+          
+          const SizedBox(height: 30),
+          
+          // Dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(6, (index) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              width: 14, height: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: index < _enteredPin.length ? const Color(0xFFFBC02D) : Colors.grey[200],
+              ),
+            )),
+          ),
+
+          const Spacer(),
+
+          // Numpad
+          Column(
+            children: [
+              _buildRow('1', '2', '3'),
+              const SizedBox(height: 20),
+              _buildRow('4', '5', '6'),
+              const SizedBox(height: 20),
+              _buildRow('7', '8', '9'),
+              const SizedBox(height: 20),
+              // Bottom Row with Centered '0'
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left Side: "Use Password" text, wrapped in container of same size as buttons
+                  SizedBox(
+                    width: buttonSize,
+                    height: buttonSize,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Text("Use\nPass", 
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey, fontSize: 12)
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Center: '0' Button
+                  _buildBtn('0'),
+                  
+                  // Right Side: Backspace, wrapped in container of same size
+                  SizedBox(
+                    width: buttonSize,
+                    height: buttonSize,
+                    child: IconButton(
+                      onPressed: _onDeletePress,
+                      icon: const Icon(Icons.backspace_outlined, size: 28),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRow(String a, String b, String c) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [_buildBtn(a), _buildBtn(b), _buildBtn(c)],
+    );
+  }
+
+  Widget _buildBtn(String text) {
+    return GestureDetector(
+      onTap: () => _onDigitPress(text),
+      child: Container(
+        width: 70, height: 70,
+        decoration: BoxDecoration(color: Colors.grey[50], shape: BoxShape.circle),
+        alignment: Alignment.center,
+        child: Text(text, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
       ),
     );
   }

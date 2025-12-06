@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'translations.dart'; // Import translations
 import 'language_selector_widget.dart'; // Import language widget
 import 'login.dart';
 import 'signup.dart';
+import 'dashboard.dart';
+import 'onboarding_view.dart';
+import 'pin_login_view.dart'; // Import Pin Login
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,12 +57,61 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  
+  final _supabase = Supabase.instance.client;
+  bool _isCheckingAuth = true;
+
   @override
   void initState() {
     super.initState();
-    // Request permissions as soon as the widget initializes
     _requestFilePermissions();
+    _checkSession(); // Check for existing login on app start
+  }
+
+  // --- Auto-Login / Quick PIN Logic ---
+  Future<void> _checkSession() async {
+    // Artificial delay for splash effect (optional)
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    final session = _supabase.auth.currentSession;
+    if (session != null) {
+      // User is logged in, check if Quick PIN is enabled
+      final prefs = await SharedPreferences.getInstance();
+      final bool isPinEnabled = prefs.getBool('quick_pin_enabled') ?? false;
+      
+      // Also check if onboarding was seen (so we don't skip it if it wasn't)
+      final user = session.user;
+      final bool hasSeenOnboarding = prefs.getBool('has_seen_onboarding_${user.id}') ?? false;
+
+      if (!mounted) return;
+
+      if (isPinEnabled) {
+        // Go to PIN Screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PinLoginView()),
+        );
+      } else {
+        // Go to Dashboard (or Onboarding)
+        if (hasSeenOnboarding) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DashboardPage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const OnboardingView()),
+          );
+        }
+      }
+    } else {
+      // Not logged in, stay on Landing Page
+      if (mounted) {
+        setState(() {
+          _isCheckingAuth = false;
+        });
+      }
+    }
   }
 
   Future<void> _requestFilePermissions() async {
@@ -73,7 +126,6 @@ class _MyHomePageState extends State<MyHomePage> {
       Map<Permission, PermissionStatus> statuses = await [
         Permission.storage,
         Permission.photos,
-        // Add Permission.manageExternalStorage if you need full file access (Use with caution)
       ].request();
 
       // Optional: Check result and show a snackbar if permanently denied
@@ -85,7 +137,6 @@ class _MyHomePageState extends State<MyHomePage> {
               duration: Duration(seconds: 3),
             ),
           );
-          // openAppSettings(); // You can uncomment this to let users open settings directly
         }
       }
     }
@@ -94,6 +145,44 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = const Color(0xFFFBC02D);
+
+    // If checking auth, show a simple loading/splash screen
+    if (_isCheckingAuth) {
+      return Scaffold(
+        backgroundColor: primaryColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.health_and_safety_rounded,
+                  color: Colors.white,
+                  size: 50,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'MedSense',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 40),
+              const CircularProgressIndicator(color: Colors.white),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: primaryColor,
