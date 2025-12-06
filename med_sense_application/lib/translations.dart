@@ -13,6 +13,7 @@ class AppTranslations {
     'English': {
       // --- Auth (Login & Signup) ---
       'login': 'Login',
+      'login_staff': 'Login as Staff',
       'signup': 'Sign Up',
       'email': 'Email',
       'password': 'Password',
@@ -78,6 +79,11 @@ class AppTranslations {
       'dental_clinic_kl': 'Dental Clinic KL Sentral',
       'coming_soon': 'Coming Soon',
       
+      // --- Chat (New) ---
+      'chat_options': 'Chat Options',
+      'chat_with_bot': 'Chat with Bot',
+      'chat_with_staff': 'Chat with Staff',
+
       // --- Locations ---
       'choose_location': 'Choose a location',
       'dental_clinic_sub': 'Dental Clinic',
@@ -126,6 +132,7 @@ class AppTranslations {
       'change_password': 'Change Password',
       'notifications': 'Notifications',
       'notifications_sub': 'Receive appointment reminders',
+      'oku_feature': 'OKU Mode', 
       'language': 'Language',
       'logout': 'Log Out',
       'permission_required': 'Permission Required',
@@ -141,6 +148,18 @@ class AppTranslations {
       'enter_new_pass': 'Enter new password',
       'reenter_new_pass': 'Re-enter new password',
       'select_birthday': 'Select Birthday',
+
+      // --- Security / PIN ---
+      'security_settings': 'Security Settings',
+      'tab_password': 'Password',
+      'tab_pin': 'Quick PIN',
+      'pin_desc': 'Create a 6-digit PIN for faster login',
+      'enter_pin': 'Enter New PIN',
+      'confirm_pin_label': 'Confirm PIN',
+      'pin_saved': 'PIN saved successfully!',
+      'pin_mismatch': 'PINs do not match',
+      'manage_password': 'Manage Password',
+      'setup_pin': 'Setup Quick PIN',
 
       // --- Payment / Cards ---
       'payment_methods': 'Payment Methods',
@@ -169,6 +188,7 @@ class AppTranslations {
     'Bahasa Melayu': {
       // --- Auth ---
       'login': 'Log Masuk',
+      'login_staff': 'Log Masuk Staf',
       'signup': 'Daftar',
       'email': 'Emel',
       'password': 'Kata Laluan',
@@ -234,6 +254,11 @@ class AppTranslations {
       'dental_clinic_kl': 'Klinik Gigi KL Sentral',
       'coming_soon': 'Akan Datang',
 
+      // --- Chat ---
+      'chat_options': 'Pilihan Sembang',
+      'chat_with_bot': 'Sembang dengan Bot',
+      'chat_with_staff': 'Sembang dengan Staf',
+
       // --- Locations ---
       'choose_location': 'Pilih lokasi',
       'dental_clinic_sub': 'Klinik Pergigian',
@@ -281,6 +306,7 @@ class AppTranslations {
       'change_password': 'Tukar Kata Laluan',
       'notifications': 'Notifikasi',
       'notifications_sub': 'Terima peringatan janji temu',
+      'oku_feature': 'Mod OKU', 
       'language': 'Bahasa',
       'logout': 'Log Keluar',
       'permission_required': 'Izin Diperlukan',
@@ -296,6 +322,18 @@ class AppTranslations {
       'enter_new_pass': 'Masukkan kata laluan baru',
       'reenter_new_pass': 'Masukkan semula kata laluan baru',
       'select_birthday': 'Pilih Hari Jadi',
+
+      // --- Security / PIN ---
+      'security_settings': 'Tetapan Keselamatan',
+      'tab_password': 'Kata Laluan',
+      'tab_pin': 'PIN Pantas',
+      'pin_desc': 'Cipta 6-digit PIN untuk log masuk pantas',
+      'enter_pin': 'Masukkan PIN Baru',
+      'confirm_pin_label': 'Sahkan PIN',
+      'pin_saved': 'PIN berjaya disimpan!',
+      'pin_mismatch': 'PIN tidak sepadan',
+      'manage_password': 'Urus Kata Laluan',
+      'setup_pin': 'Tetapkan PIN Pantas',
 
       // --- Payment / Cards ---
       'payment_methods': 'Kaedah Pembayaran',
@@ -324,6 +362,7 @@ class AppTranslations {
     'Mandarin': {
       // --- Auth ---
       'login': '登录',
+      'login_staff': '员工登录',
       'signup': '注册',
       'email': '电子邮件',
       'password': '密码',
@@ -389,6 +428,11 @@ class AppTranslations {
       'dental_clinic_kl': '吉隆坡仙特拉牙科诊所',
       'coming_soon': '即将推出',
 
+      // --- Chat ---
+      'chat_options': '聊天选项',
+      'chat_with_bot': '与机器人聊天',
+      'chat_with_staff': '与员工聊天',
+
       // --- Locations ---
       'choose_location': '选择位置',
       'dental_clinic_sub': '牙科诊所',
@@ -436,6 +480,7 @@ class AppTranslations {
       'change_password': '更改密码',
       'notifications': '通知',
       'notifications_sub': '接收预约提醒',
+      'oku_feature': 'OKU 模式', 
       'language': '语言',
       'logout': '登出',
       'permission_required': '需要权限',
@@ -451,6 +496,18 @@ class AppTranslations {
       'enter_new_pass': '输入新密码',
       'reenter_new_pass': '重新输入新密码',
       'select_birthday': '选择生日',
+
+      // --- Security / PIN ---
+      'security_settings': '安全设置',
+      'tab_password': '密码',
+      'tab_pin': '快速 PIN',
+      'pin_desc': '创建一个 6 位数的 PIN 码以便更快登录',
+      'enter_pin': '输入新 PIN',
+      'confirm_pin_label': '确认 PIN',
+      'pin_saved': 'PIN 保存成功！',
+      'pin_mismatch': 'PIN 不匹配',
+      'manage_password': '管理密码',
+      'setup_pin': '设置快速 PIN',
 
       // --- Payment / Cards ---
       'payment_methods': '支付方式',

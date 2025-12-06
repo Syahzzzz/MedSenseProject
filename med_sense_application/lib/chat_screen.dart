@@ -6,18 +6,25 @@ import 'message_bubble.dart';  // ← Import!
 class ChatScreen extends StatefulWidget {
   final String? queueToken;
 
-  const ChatScreen({Key? key, this.queueToken}) : super(key: key);
+  const ChatScreen({super.key, this.queueToken});
 
   @override
-  _ChatScreenState createState() => _ChatScreenState(); }
+  State<ChatScreen> createState() => _ChatScreenState(); }
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-  final List<Map<String, dynamic>> messages = [];
+  final List<Map<String, dynamic>> _messages = [];
   final String userId = "patient${DateTime.now().millisecondsSinceEpoch}";
   final String fastApiUrl = "https://medsense.com/api/botsense";
 
-Future<void> _sendMessage() async {
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return "$hour:$minute $period";
+  }
+
+  Future<void> _sendMessage() async {
     final msg = _controller.text.trim();
     if (msg.isEmpty) return;
 
@@ -68,8 +75,7 @@ Future<void> _sendMessage() async {
     return Scaffold(
       backgroundColor: Color(0xFFF5F9FF),
       appBar: AppBar(
-        title: const Text('BotSense 🦷
-', style: TextStyle(color: Colors.white)),
+        title: const Text('BotSense 🦷', style: TextStyle(color: Colors.white)),
         backgroundColor: Color(0xFF2196F3),
         elevation: 0,
       ),
@@ -113,13 +119,13 @@ Container(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: controller,
+                    controller: _controller,
                     decoration: InputDecoration(
                       hintText: 'Ask queue status, OKU priority, appointments...',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
                       contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
-                    onSubmitted: () => _sendMessage(),
+                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
                 SizedBox(width: 12),

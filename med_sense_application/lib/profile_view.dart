@@ -24,18 +24,18 @@ class _ProfileViewState extends State<ProfileView> {
   String? _avatarUrl;
   String _patientId = "--------"; 
   bool _notificationsEnabled = false;
+  bool _isOkuEnabled = false; // New state for OKU toggle
 
   // --- Lifecycle ---
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
-    _checkNotificationStatus();
+    _loadLocalSettings(); // Load notifications and OKU status
   }
 
   // --- Data Loading ---
   Future<void> _loadUserProfile() async {
-    // 1. Refresh Session (Optional but good practice)
     try {
         await _supabase.auth.refreshSession();
     } catch (_) {}
@@ -43,8 +43,6 @@ class _ProfileViewState extends State<ProfileView> {
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
-        // 2. Query the Public 'Patient' Table
-        // We link auth.users.id to public.Patient.patient_id
         final data = await _supabase
             .from('Patient')
             .select()
@@ -53,30 +51,27 @@ class _ProfileViewState extends State<ProfileView> {
 
         if (mounted) {
           setState(() {
-            // Email is strictly from Auth for security
             _email = user.email ?? "";
             
-            // Avatar is stored in Metadata (as per your edit logic)
             String? url = user.userMetadata?['avatar_url'];
             if (url != null) {
-               _avatarUrl = "$url?t=${DateTime.now().millisecondsSinceEpoch}";
+            _avatarUrl = "$url?t=${DateTime.now().millisecondsSinceEpoch}";
             }
 
             if (data != null) {
-              // Source of Truth: Database Table
               _userName = data['name'] ?? "User";
               
-              // Get ID from DB. Since it's a UUID, we format it to be readable.
               String rawId = data['patient_id'].toString();
               if (rawId.length >= 8) {
                 _patientId = rawId.substring(0, 8).toUpperCase();
               } else {
                 _patientId = rawId;
               }
+              
+              // Load initial OKU status from DB if needed, though local preference overrides for toggle
+              // bool dbOku = data['is_oku'] ?? false;
             } else {
-              // Fallback: Metadata (if DB record missing)
               _userName = user.userMetadata?['full_name'] ?? "User";
-              // Fallback ID from Auth User ID
               if (user.id.length >= 8) {
                 _patientId = user.id.substring(0, 8).toUpperCase();
               }
@@ -89,10 +84,17 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  Future<void> _checkNotificationStatus() async {
+  Future<void> _loadLocalSettings() async {
     final status = await Permission.notification.status;
+    final prefs = await SharedPreferences.getInstance();
+    // Load OKU status, defaulting to false if not set
+    final okuStatus = prefs.getBool('is_oku_enabled') ?? false;
+
     if (mounted) {
-      setState(() => _notificationsEnabled = status.isGranted);
+      setState(() {
+        _notificationsEnabled = status.isGranted;
+        _isOkuEnabled = okuStatus;
+      });
     }
   }
 
@@ -116,6 +118,26 @@ class _ProfileViewState extends State<ProfileView> {
     } else {
       setState(() => _notificationsEnabled = false);
     }
+  }
+
+  // --- New OKU Toggle Action ---
+  Future<void> _toggleOku(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_oku_enabled', value); // Save preference
+    
+    // Optional: Sync this change back to Supabase 'Patient' table if you want it to be persistent across devices
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        await _supabase.from('Patient').update({'is_oku': value}).eq('patient_id', user.id);
+      } catch (e) {
+        debugPrint("Failed to sync OKU status to DB: $e");
+      }
+    }
+
+    setState(() {
+      _isOkuEnabled = value;
+    });
   }
 
   void _showSettingsDialog() {
@@ -207,7 +229,6 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // Shows confirmation dialog with "Remember Me" reset warning
   void _showLogoutConfirmation() {
     showDialog(
       context: context,
@@ -359,7 +380,7 @@ class _ProfileViewState extends State<ProfileView> {
               },
             ),
 
-            // --- NEW: Payment Methods Menu Item ---
+            // Payment Methods Menu Item
             _buildMenuTile(
               icon: Icons.payment,
               title: AppTranslations.get('payment_methods'),
@@ -372,6 +393,22 @@ class _ProfileViewState extends State<ProfileView> {
             ),
 
             const Divider(height: 30),
+
+            // --- NEW OKU Toggle (Above Notifications) ---
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              activeTrackColor: const Color(0xFFFBC02D),
+              title: Text(
+                AppTranslations.get('oku_feature'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                "Enable accessibility features",
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              value: _isOkuEnabled,
+              onChanged: _toggleOku,
+            ),
 
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

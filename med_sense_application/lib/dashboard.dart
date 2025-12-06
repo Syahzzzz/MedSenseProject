@@ -7,6 +7,7 @@ import 'location_view.dart';
 import 'services_view.dart'; 
 import 'profile_view.dart'; 
 import 'translations.dart';
+import 'chat_screen.dart'; // Ensure ChatScreen is imported
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -15,13 +16,17 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState extends State<DashboardPage> with SingleTickerProviderStateMixin {
   // --- State & Dependencies ---
   final _supabase = Supabase.instance.client;
   String _userName = "User"; 
   String? _avatarUrl; 
   int _selectedIndex = 0; 
   String _selectedServiceCategory = 'Braces';
+
+  // Chat Expansion State
+  bool _isChatExpanded = false;
+  late AnimationController _chatAnimationController;
 
   // Dynamic Services Data
   bool _isServicesLoading = true;
@@ -42,9 +47,20 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadUserProfile();
     _fetchServices(); // Load services on init
     
+    _chatAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestNotificationPermission();
     });
+  }
+
+  @override
+  void dispose() {
+    _chatAnimationController.dispose();
+    super.dispose();
   }
 
   // --- Fetch Services from Supabase ---
@@ -160,6 +176,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final Color navBarColor = const Color(0xFFFFF9C4);
+    final Color primaryYellow = const Color(0xFFFBC02D);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -167,6 +184,67 @@ class _DashboardPageState extends State<DashboardPage> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         child: _getBody(),
+      ),
+
+      // --- Expandable Chat FAB ---
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (_isChatExpanded) ...[
+            // Chat with Staff Button
+            FloatingActionButton.extended(
+              heroTag: 'chat_staff',
+              onPressed: () {
+                // TODO: Implement Staff Chat
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Staff chat coming soon!')),
+                );
+                setState(() => _isChatExpanded = false);
+              },
+              backgroundColor: Colors.teal,
+              label: Text(AppTranslations.get('chat_with_staff'), style: const TextStyle(color: Colors.white)),
+              icon: const Icon(Icons.people, color: Colors.white),
+            ),
+            const SizedBox(height: 12),
+            
+            // Chat with Bot Button
+            FloatingActionButton.extended(
+              heroTag: 'chat_bot',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatScreen()),
+                );
+                setState(() => _isChatExpanded = false);
+              },
+              backgroundColor: Colors.blueAccent,
+              label: Text(AppTranslations.get('chat_with_bot'), style: const TextStyle(color: Colors.white)),
+              icon: const Icon(Icons.smart_toy, color: Colors.white),
+            ),
+            const SizedBox(height: 12),
+          ],
+          
+          // Main Toggle Button
+          FloatingActionButton(
+            heroTag: 'chat_toggle',
+            onPressed: () {
+              setState(() {
+                _isChatExpanded = !_isChatExpanded;
+                if (_isChatExpanded) {
+                  _chatAnimationController.forward();
+                } else {
+                  _chatAnimationController.reverse();
+                }
+              });
+            },
+            backgroundColor: primaryYellow,
+            child: Icon(
+              _isChatExpanded ? Icons.close : Icons.chat_bubble_outline,
+              color: Colors.black,
+            ),
+          ),
+        ],
       ),
 
       bottomNavigationBar: Container(

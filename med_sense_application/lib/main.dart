@@ -281,6 +281,37 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                         ),
                       ),
+
+                      const SizedBox(height: 15),
+
+                      // --- Staff Login Button (New) ---
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // TODO: Navigate to Staff Login Page
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Staff Portal Coming Soon")),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueGrey.shade800, // Distinct dark color for staff
+                            foregroundColor: Colors.white,
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: Text(
+                            AppTranslations.get('login_staff'),
+                            style: const TextStyle(
+                              fontSize: 16, 
+                              fontWeight: FontWeight.bold
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
