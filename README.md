@@ -1,4 +1,4 @@
-# MedSenseProject
+# MedSenseProject ( PROTOTYPE )
 
 **Smart Clinic Queue Management System with AI & Accessibility Integration**
 
