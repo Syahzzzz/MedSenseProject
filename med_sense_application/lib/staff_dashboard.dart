@@ -3,7 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart'; // To navigate back to main/home on logout
 
 class StaffDashboard extends StatefulWidget {
-  const StaffDashboard({super.key});
+  final String? staffName; // Optional name passed from login
+
+  const StaffDashboard({super.key, this.staffName});
 
   @override
   State<StaffDashboard> createState() => _StaffDashboardState();
@@ -11,25 +13,21 @@ class StaffDashboard extends StatefulWidget {
 
 class _StaffDashboardState extends State<StaffDashboard> {
   final _supabase = Supabase.instance.client;
-  String _staffName = "Staff";
+  late String _displayName;
 
   @override
   void initState() {
     super.initState();
-    _loadStaffProfile();
-  }
-
-  Future<void> _loadStaffProfile() async {
-    final user = _supabase.auth.currentUser;
-    if (user != null) {
-      setState(() {
-        _staffName = user.userMetadata?['full_name'] ?? "Staff";
-      });
-    }
+    // Use passed name, or fallback to Auth metadata, or generic "Staff"
+    _displayName = widget.staffName ?? 
+                   _supabase.auth.currentUser?.userMetadata?['full_name'] ?? 
+                   "Staff";
   }
 
   Future<void> _logout() async {
+    // Sign out from Supabase (clears session if any)
     await _supabase.auth.signOut();
+    
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -60,7 +58,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
             const Icon(Icons.medical_services, size: 100, color: Colors.blueGrey),
             const SizedBox(height: 20),
             Text(
-              "Welcome, $_staffName",
+              "Welcome, $_displayName",
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -69,10 +67,19 @@ class _StaffDashboardState extends State<StaffDashboard> {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 40),
-            // Placeholder for future staff features
-            _buildStaffAction(Icons.list_alt, "View Queue"),
-            const SizedBox(height: 15),
-            _buildStaffAction(Icons.person_add, "Register Patient"),
+            
+            // Staff Actions Grid
+            Wrap(
+              spacing: 20,
+              runSpacing: 20,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildStaffAction(Icons.list_alt, "View Queue"),
+                _buildStaffAction(Icons.person_add, "Register Patient"),
+                _buildStaffAction(Icons.calendar_today, "Appointments"),
+                _buildStaffAction(Icons.settings, "Settings"),
+              ],
+            ),
           ],
         ),
       ),
@@ -81,19 +88,35 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
   Widget _buildStaffAction(IconData icon, String label) {
     return Container(
-      width: 200,
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+      width: 150,
+      height: 100,
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.blueGrey.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.blueGrey.shade200),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.2),
+            blurRadius: 10,
+            spreadRadius: 2,
+          )
+        ],
+        border: Border.all(color: Colors.blueGrey.shade100),
       ),
-      child: Row(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: Colors.blueGrey.shade800),
-          const SizedBox(width: 10),
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey.shade900)),
+          Icon(icon, color: Colors.blueGrey.shade800, size: 30),
+          const SizedBox(height: 10),
+          Text(
+            label, 
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.bold, 
+              color: Colors.blueGrey.shade900,
+              fontSize: 13
+            )
+          ),
         ],
       ),
     );
