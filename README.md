@@ -1,4 +1,4 @@
-# MedSenseProject
+# MedSenseProject ( PROTOTYPE )
 
 **Smart Clinic Queue Management System with AI & Accessibility Integration**
 
@@ -13,15 +13,15 @@
 
 By leveraging **Artificial Intelligence**, MedSense predicts waiting times dynamically. Uniquely, it prioritizes inclusivity with dedicated features for **OKU (Persons with Disabilities)**, ensuring equitable access to healthcare services.
 
-## ✨ Key Features
+## Key Features
 
-* **🧠 AI-Powered Estimations:** Uses historical data and real-time inputs to provide accurate waiting time predictions for patients.
-* **♿ OKU-Friendly:** Specialized interface and priority queue logic for disabled (OKU) users and the elderly.
-* **📱 Real-Time Queue Tracking:** Patients can track their queue status remotely via the mobile app, reducing congestion in the clinic.
-* **🔔 Smart Notifications:** Push notifications alert patients when their turn is approaching.
-* **📊 Clinic Admin Dashboard:** A web/tablet view for staff to manage queues, doctors, and patient flow efficiently.
+* **AI-Powered Estimations:** Uses historical data and real-time inputs to provide accurate waiting time predictions for patients.
+* **OKU-Friendly:** Specialized interface and priority queue logic for disabled (OKU) users and the elderly.
+* **Real-Time Queue Tracking:** Patients can track their queue status remotely via the mobile app, reducing congestion in the clinic.
+* **Smart Notifications:** Push notifications alert patients when their turn is approaching.
+* **Clinic Admin Dashboard:** A web/tablet view for staff to manage queues, doctors, and patient flow efficiently.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 * **Frontend:** Flutter (Dart)
 * **Backend:** Python - fastAPI
