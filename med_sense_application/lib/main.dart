@@ -9,6 +9,7 @@ import 'signup.dart';
 import 'dashboard.dart';
 import 'onboarding_view.dart';
 import 'pin_login_view.dart'; // Import Pin Login
+import 'staff_login_view.dart'; // Import Staff Login View
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -140,6 +141,75 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     }
+  }
+
+  // --- BRANCH CODE CHECK FUNCTION (Added) ---
+  void _showBranchCodeDialog(BuildContext context) {
+    final branchCodeController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text("Enter Branch Code"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Enter the code for your specific clinic branch."),
+              const SizedBox(height: 15),
+              TextField(
+                controller: branchCodeController,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  hintText: "Branch Code",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx), // Close dialog
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final code = branchCodeController.text.trim();
+                String? branchName;
+
+                // Validate Code and Assign Branch Name
+                if (code == "1001") {
+                  branchName = "Rawang";
+                } else if (code == "1002") {
+                  branchName = "Selayang";
+                } else if (code == "1003") {
+                  branchName = "Kuala Lumpur";
+                }
+
+                if (branchName != null) {
+                  Navigator.pop(ctx); // Close Dialog
+                  // Navigate to Staff Login with Branch Name
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StaffLoginView(branchName: branchName!),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Invalid Branch Code")),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey),
+              child: const Text("Verify", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -373,17 +443,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
                       const SizedBox(height: 15),
 
-                      // --- Staff Login Button (New) ---
+                      // --- Staff Login Button (UPDATED) ---
                       SizedBox(
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
-                          onPressed: () {
-                            // TODO: Navigate to Staff Login Page
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Staff Portal Coming Soon")),
-                            );
-                          },
+                          onPressed: () => _showBranchCodeDialog(context), // Call function here
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blueGrey.shade800, // Distinct dark color for staff
                             foregroundColor: Colors.white,
