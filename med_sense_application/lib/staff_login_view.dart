@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Import Shared Preferences
 import 'staff_dashboard.dart';
 
 class StaffLoginView extends StatefulWidget {
-  // We keep this parameter optional so your app doesn't crash if it passes it,
-  // but we won't use it for any logic.
   final String? branchName;
 
   const StaffLoginView({super.key, this.branchName});
@@ -15,6 +14,7 @@ class StaffLoginView extends StatefulWidget {
 
 class _StaffLoginViewState extends State<StaffLoginView> {
   bool _isLoading = false;
+  bool _rememberMe = false; // State for checkbox
   
   // Controllers
   final _emailController = TextEditingController();
@@ -23,10 +23,30 @@ class _StaffLoginViewState extends State<StaffLoginView> {
   final _supabase = Supabase.instance.client;
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserCredentials(); // Load saved credentials on start
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // Load saved credentials
+  Future<void> _loadUserCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _rememberMe = prefs.getBool('staff_remember_me') ?? false;
+        if (_rememberMe) {
+          _emailController.text = prefs.getString('staff_email') ?? '';
+          _passwordController.text = prefs.getString('staff_password') ?? '';
+        }
+      });
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -43,30 +63,71 @@ class _StaffLoginViewState extends State<StaffLoginView> {
     setState(() => _isLoading = true);
 
     try {
-      // Supabase Login
-      final AuthResponse res = await _supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
+      // Call the custom Postgres RPC function 'login_staff'
+      final response = await _supabase.rpc(
+        'login_staff', 
+        params: {
+          'email_input': email, 
+          'password_input': password
+        }
       );
 
-      if (res.user != null) {
+      // Log response for debugging
+      debugPrint("Login Response: $response");
+
+      if (response != null && response['success'] == true) {
+        final staffData = response['data'];
+        
+        // Handle "Remember Me" logic
+        final prefs = await SharedPreferences.getInstance();
+        if (_rememberMe) {
+          await prefs.setBool('staff_remember_me', true);
+          await prefs.setString('staff_email', email);
+          await prefs.setString('staff_password', password); // Note: Storing password in plain prefs is not recommended for high security apps
+        } else {
+          await prefs.remove('staff_remember_me');
+          await prefs.remove('staff_email');
+          await prefs.remove('staff_password');
+        }
+
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Login Successful"), backgroundColor: Colors.green),
+          );
+
+          // Navigate to Dashboard with staff details
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const StaffDashboard()),
+            MaterialPageRoute(
+              builder: (context) => StaffDashboard(
+                staffName: staffData['name'],
+                staffRole: staffData['role'],
+                isAdmin: staffData['is_admin'],
+              ),
+            ),
+          );
+        }
+      } else {
+        // Login Failed
+        final message = response != null ? response['message'] : "Unknown error";
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Login Failed: $message"), backgroundColor: Colors.red),
           );
         }
       }
-    } on AuthException catch (e) {
+    } on PostgrestException catch (e) {
+      // Handle Database errors
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+          SnackBar(content: Text("Database Error: ${e.message}"), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
+      // Handle generic errors
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login failed. Check internet connection."), backgroundColor: Colors.red),
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -94,7 +155,7 @@ class _StaffLoginViewState extends State<StaffLoginView> {
             children: [
               // Logo or Icon
               Image.asset(
-                'images/logo.png', // Ensure you have this or change to Icon
+                'images/logo.png',
                 height: 100,
                 errorBuilder: (context, error, stackTrace) => 
                   const Icon(Icons.medical_services_outlined, size: 80, color: Colors.blueGrey),
@@ -107,7 +168,7 @@ class _StaffLoginViewState extends State<StaffLoginView> {
               ),
               const SizedBox(height: 10),
               const Text(
-                "Please log in to continue",
+                "Secure Access for Clinic Staff",
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 40),
@@ -115,6 +176,7 @@ class _StaffLoginViewState extends State<StaffLoginView> {
               // Email Input
               TextField(
                 controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   labelText: "Staff Email",
                   prefixIcon: const Icon(Icons.email_outlined),
@@ -135,7 +197,24 @@ class _StaffLoginViewState extends State<StaffLoginView> {
                   contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 10),
+
+              // Remember Me Checkbox
+              Row(
+                children: [
+                  Checkbox(
+                    value: _rememberMe,
+                    activeColor: Colors.blueGrey[800],
+                    onChanged: (value) {
+                      setState(() {
+                        _rememberMe = value!;
+                      });
+                    },
+                  ),
+                  const Text("Remember Me"),
+                ],
+              ),
+              const SizedBox(height: 20),
 
               // Login Button
               SizedBox(

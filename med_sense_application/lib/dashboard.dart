@@ -7,7 +7,8 @@ import 'location_view.dart';
 import 'services_view.dart'; 
 import 'profile_view.dart'; 
 import 'translations.dart';
-import 'chat_screen.dart'; // Ensure ChatScreen is imported
+import 'chat_screen.dart'; 
+import 'staff_selection_view.dart'; // Imported Staff Selection
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -196,9 +197,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             FloatingActionButton.extended(
               heroTag: 'chat_staff',
               onPressed: () {
-                // TODO: Implement Staff Chat
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Staff chat coming soon!')),
+                // Navigate to Staff Selection
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StaffSelectionView()),
                 );
                 setState(() => _isChatExpanded = false);
               },
@@ -214,7 +216,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ChatScreen()),
+                  MaterialPageRoute(builder: (context) => const ChatScreen(isBot: true)),
                 );
                 setState(() => _isChatExpanded = false);
               },
