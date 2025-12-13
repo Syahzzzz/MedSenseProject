@@ -66,7 +66,7 @@ class AppTranslations {
       'services': 'Services',
       'services_title': 'Services',
       'view_all': 'View all',
-      'top_doctor': 'Top Doctor & Staff',
+      'top_doctor': 'Top Doctor',
       'dentist': 'Dentist',
       'dentist_ortho': 'Dentist - Orthodontist',
       'dentist_surgeon': 'Dentist - Surgeon',
@@ -185,6 +185,7 @@ class AppTranslations {
       'online_banking': 'Online Banking',
       'confirm': 'Confirm',
       'booking_success': 'Booking Successful!',
+      'booking_history': 'Booking History',
     },
     'Bahasa Melayu': {
       // --- Auth ---
@@ -242,7 +243,7 @@ class AppTranslations {
       'services': 'Perkhidmatan',
       'services_title': 'Perkhidmatan',
       'view_all': 'Lihat semua',
-      'top_doctor': 'Doktor & Staf Terbaik',
+      'top_doctor': 'Doktor Terbaik',
       'dentist': 'Doktor Gigi',
       'dentist_ortho': 'Doktor Gigi - Ortodontik',
       'dentist_surgeon': 'Doktor Gigi - Pakar Bedah',
@@ -360,6 +361,7 @@ class AppTranslations {
       'online_banking': 'Perbankan Atas Talian',
       'confirm': 'Sahkan',
       'booking_success': 'Tempahan Berjaya!',
+      'booking_history': 'Sejarah Tempahan',
     },
     'Mandarin': {
       // --- Auth ---
@@ -417,7 +419,7 @@ class AppTranslations {
       'services': '服务',
       'services_title': '服务',
       'view_all': '查看全部',
-      'top_doctor': '顶级医生与员工',
+      'top_doctor': '顶级医生',
       'dentist': '牙医',
       'dentist_ortho': '牙医 - 正畸医生',
       'dentist_surgeon': '牙医 - 外科医生',
@@ -535,6 +537,7 @@ class AppTranslations {
       'online_banking': '网上银行',
       'confirm': '确认',
       'booking_success': '预订成功！',
+      'booking_history': '预约记录',
     },
   };
 }

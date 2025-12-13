@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dashboard.dart';
 import 'translations.dart';
 
@@ -29,6 +30,8 @@ class ReviewConfirmView extends StatefulWidget {
 }
 
 class _ReviewConfirmViewState extends State<ReviewConfirmView> {
+  final _supabase = Supabase.instance.client;
+  bool _isLoading = false;
   String _paymentMethod = 'Credit/debit'; // Default
   // Theme Color
   final Color _primaryYellow = const Color(0xFFFBC02D);
@@ -38,22 +41,94 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
     super.initState();
   }
 
-  void _handleConfirm() {
-    // Here you would typically save the booking to your database
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppTranslations.get('booking_success')),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
-      ),
-    );
-    
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const DashboardPage()),
-      (route) => false,
-    );
+  Future<void> _handleConfirm() async {
+    setState(() => _isLoading = true);
+    final user = _supabase.auth.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to book.')));
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      // 1. Get Service ID
+      final serviceRes = await _supabase
+          .from('Service')
+          .select('service_id')
+          .eq('service_name', widget.serviceName)
+          .maybeSingle();
+      
+      if (serviceRes == null) throw "Service not found: ${widget.serviceName}";
+      final serviceId = serviceRes['service_id'];
+
+      // 2. Get Doctor ID
+      final doctorRes = await _supabase
+          .from('Doctor')
+          .select('doctor_id')
+          .eq('name', widget.doctorName)
+          .maybeSingle();
+
+      if (doctorRes == null) throw "Doctor not found: ${widget.doctorName}";
+      final doctorId = doctorRes['doctor_id'];
+
+      // 3. Combine Date & Time
+      final DateTime fullDateTime = _parseDateTime(widget.date, widget.time);
+
+      // 4. Insert Appointment
+      await _supabase.from('Appointment').insert({
+        'patient_id': user.id,
+        'doctor_id': doctorId,
+        'service_id': serviceId,
+        'appointment_datetime': fullDateTime.toIso8601String(),
+        'status': 'Confirmed', 
+        'predicted_wait_time_minutes': 0, 
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppTranslations.get('booking_success')),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(20),
+        ),
+      );
+      
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardPage()),
+        (route) => false,
+      );
+
+    } catch (e) {
+      debugPrint('Booking Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Booking failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  DateTime _parseDateTime(DateTime date, String timeStr) {
+    try {
+      final parts = timeStr.split(' '); 
+      final timeParts = parts[0].split(':'); 
+      int hour = int.parse(timeParts[0]);
+      int minute = int.parse(timeParts[1]);
+      
+      if (parts[1] == 'PM' && hour != 12) hour += 12;
+      if (parts[1] == 'AM' && hour == 12) hour = 0;
+
+      return DateTime(date.year, date.month, date.day, hour, minute);
+    } catch (e) {
+      debugPrint("Time parsing error: $e");
+      return date;
+    }
   }
 
   // --- Helper to parse "RM 123" to 123.0 ---
@@ -403,7 +478,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                           SizedBox(
                             height: 50,
                             child: ElevatedButton(
-                              onPressed: _handleConfirm,
+                              onPressed: _isLoading ? null : _handleConfirm,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFBC02D),
                                 foregroundColor: Colors.black,
@@ -413,10 +488,12 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                                 ),
                                 padding: const EdgeInsets.symmetric(horizontal: 40),
                               ),
-                              child: Text(
-                                AppTranslations.get('confirm'),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
+                              child: _isLoading 
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                                : Text(
+                                    AppTranslations.get('confirm'),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
                             ),
                           ),
                         ],

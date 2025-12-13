@@ -9,6 +9,7 @@ import 'profile_view.dart';
 import 'translations.dart';
 import 'chat_screen.dart'; 
 import 'staff_selection_view.dart'; // Imported Staff Selection
+import 'booking_history_view.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -33,20 +34,20 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   bool _isServicesLoading = true;
   Map<String, List<Map<String, String>>> _servicesData = {};
 
+  // Doctors Data
+  bool _isDoctorsLoading = true;
+  List<Map<String, dynamic>> _topDoctors = [];
+
   // --- Data Constants ---
   final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers', 'Others'];
-
-  List<Map<String, String>> get _doctors => [
-    {'name': 'Dr. Sarah Smith', 'specialization': AppTranslations.get('dentist_ortho'), 'image': 'images/sarah.png'},
-    {'name': 'Dr. John Doe', 'specialization': AppTranslations.get('dentist_surgeon'), 'image': 'images/john.png'},
-  ];
 
   // --- Lifecycle ---
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
-    _fetchServices(); // Load services on init
+    _fetchServices(); 
+    _fetchTopDoctors();
     
     _chatAnimationController = AnimationController(
       vsync: this,
@@ -128,6 +129,27 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     } catch (e) {
       debugPrint('Error loading services for dashboard: $e');
       if (mounted) setState(() => _isServicesLoading = false);
+    }
+  }
+
+  Future<void> _fetchTopDoctors() async {
+    try {
+      final response = await _supabase
+          .from('Doctor')
+          .select('name, specialization, years_experience')
+          .gt('years_experience', 10)
+          .order('years_experience', ascending: false) // Best first
+          .limit(5);
+
+      if (mounted) {
+        setState(() {
+          _topDoctors = List<Map<String, dynamic>>.from(response);
+          _isDoctorsLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching top doctors: $e');
+      if (mounted) setState(() => _isDoctorsLoading = false);
     }
   }
 
@@ -288,34 +310,47 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Center(child: Text(AppTranslations.get('coming_soon')));
   }
 
+  Future<void> _refreshDashboard() async {
+    _loadUserProfile();
+    await Future.wait([
+      _fetchServices(),
+      _fetchTopDoctors(),
+    ]);
+  }
+
   Widget _buildHome() {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24), 
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 20),
-            
-            _buildGreeting(),
-            const SizedBox(height: 15),
-            
-            _buildAppointmentBanner(),
-            const SizedBox(height: 30),
-            
-            _buildServicesSection(),
-            const SizedBox(height: 20),
-            
-            // Show loading or the list
-            _isServicesLoading 
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFFFBC02D)))
-                : _buildServicesList(),
-                
-            const SizedBox(height: 30),
-            
-            _buildDoctorsSection(),
-          ],
+    return RefreshIndicator(
+      onRefresh: _refreshDashboard,
+      color: const Color(0xFFFBC02D),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24), 
+          physics: const AlwaysScrollableScrollPhysics(), // Ensure scroll even if content is short
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 20),
+              
+              _buildGreeting(),
+              const SizedBox(height: 15),
+              
+              _buildAppointmentBanner(),
+              const SizedBox(height: 30),
+              
+              _buildServicesSection(),
+              const SizedBox(height: 20),
+              
+              // Show loading or the list
+              _isServicesLoading 
+                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFFBC02D)))
+                  : _buildServicesList(),
+                  
+              const SizedBox(height: 30),
+              
+              _buildDoctorsSection(),
+            ],
+          ),
         ),
       ),
     ); 
@@ -330,17 +365,26 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           color: Colors.redAccent,
           onPressed: () => _showLogoutConfirmation(context),
         ),
-        GestureDetector(
-          onTap: () => setState(() => _selectedIndex = 3),
-          child: CircleAvatar(
-            backgroundColor: const Color(0xFFFBC02D), 
-            backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
-                ? NetworkImage(_avatarUrl!)
-                : null,
-            child: _avatarUrl == null || _avatarUrl!.isEmpty
-                ? const Icon(Icons.person, color: Colors.white)
-                : null,
-          ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.history, color: Colors.black54),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingHistoryView())),
+            ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: () => setState(() => _selectedIndex = 3),
+              child: CircleAvatar(
+                backgroundColor: const Color(0xFFFBC02D), 
+                backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                    ? NetworkImage(_avatarUrl!)
+                    : null,
+                child: _avatarUrl == null || _avatarUrl!.isEmpty
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -574,72 +618,95 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           child: Text(AppTranslations.get('top_doctor'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))
         ),
         const SizedBox(height: 15),
-        Column(
-          children: _doctors.map((d) => Container(
-            margin: const EdgeInsets.only(bottom: 15),
-            height: 100, 
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.2),
-                  spreadRadius: 2,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(15),
+        
+        if (_isDoctorsLoading)
+           const Center(child: CircularProgressIndicator(color: Color(0xFFFBC02D)))
+        else if (_topDoctors.isEmpty)
+           Padding(
+             padding: const EdgeInsets.all(20),
+             child: Text("No top doctors found at the moment.", style: TextStyle(color: Colors.grey[600])),
+           )
+        else
+          Column(
+            children: _topDoctors.map((d) {
+              // Simple image logic since DB doesn't have image column yet
+              String imageAsset = 'images/john.png';
+              final String name = d['name'].toString();
+              if (name.toLowerCase().contains('sarah') || name.toLowerCase().contains('jane') || name.toLowerCase().contains('fatimah')) {
+                imageAsset = 'images/sarah.png';
+              }
+              
+              return Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                constraints: const BoxConstraints(minHeight: 100), // Flexible height
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withValues(alpha: 0.2),
+                      spreadRadius: 2,
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: Image.asset(
-                        d['image']!,
-                        fit: BoxFit.cover, 
-                        alignment: Alignment.topCenter,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(Icons.person, color: Colors.grey[400], size: 40);
-                        },
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: Image.asset(
+                            imageAsset,
+                            fit: BoxFit.cover, 
+                            alignment: Alignment.topCenter,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(Icons.person, color: Colors.grey[400], size: 40);
+                            },
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 15.0, top: 20, bottom: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          d['name']!,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 12.0), // Reduced vertical padding
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              d['specialization']!,
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                             Text(
+                              "${d['years_experience']} years exprience",
+                              style: const TextStyle(fontSize: 11, color: Colors.teal, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 5),
-                        Text(
-                          d['specialization']!,
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          )).toList()
-        ),
+              );
+            }).toList()
+          ),
       ],
     );
   }
