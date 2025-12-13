@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dashboard.dart';
 import 'translations.dart';
+import 'booking_success_view.dart'; // Import the new success view
 
 class ReviewConfirmView extends StatefulWidget {
   final String clinicNameKey;
@@ -87,19 +87,10 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppTranslations.get('booking_success')),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(20),
-        ),
-      );
-      
-      Navigator.pushAndRemoveUntil(
+      // Navigate to Success View instead of generic Snackbar/Home
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const DashboardPage()),
-        (route) => false,
+        MaterialPageRoute(builder: (context) => const BookingSuccessView()),
       );
 
     } catch (e) {
@@ -442,9 +433,9 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                           ),
                           const SizedBox(height: 15),
                           
-                          _buildPaymentOption(AppTranslations.get('credit_debit')),
+                          _buildPaymentOption(AppTranslations.get('credit_debit'), Icons.credit_card),
                           const SizedBox(height: 12),
-                          _buildPaymentOption(AppTranslations.get('online_banking')),
+                          _buildPaymentOption(AppTranslations.get('online_banking'), Icons.account_balance),
                         ],
                       ),
                     ),
@@ -509,7 +500,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
     );
   }
 
-  Widget _buildPaymentOption(String label) {
+  Widget _buildPaymentOption(String label, IconData icon) {
     final bool isSelected = _paymentMethod == label;
     return GestureDetector(
       onTap: () => setState(() => _paymentMethod = label),
@@ -525,6 +516,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                 color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(6),
               ),
+              child: Icon(icon, color: Colors.black54, size: 20),
             ),
             const SizedBox(width: 15),
             Text(label, style: const TextStyle(fontSize: 15, color: Colors.black87)),

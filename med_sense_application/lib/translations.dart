@@ -186,6 +186,13 @@ class AppTranslations {
       'confirm': 'Confirm',
       'booking_success': 'Booking Successful!',
       'booking_history': 'Booking History',
+
+      // --- Booking Success Screen ---
+      'booking_successful_title': 'Booking successfully',
+      'booking_successful_subtitle': 'Your booking was approved and successful',
+      'your_booking_was_successful': 'Your booking\nwas successful',
+      'booking_success_desc': 'Booking was successful! Your request has been processed. If you have further questions or need additional assistance, feel free to contact our support team. Thank you for using our service!',
+      'proceed_homepage': 'Proceed to homepage',
     },
     'Bahasa Melayu': {
       // --- Auth ---
@@ -362,6 +369,13 @@ class AppTranslations {
       'confirm': 'Sahkan',
       'booking_success': 'Tempahan Berjaya!',
       'booking_history': 'Sejarah Tempahan',
+
+      // --- Booking Success Screen ---
+      'booking_successful_title': 'Tempahan Berjaya',
+      'booking_successful_subtitle': 'Tempahan anda telah diluluskan dan berjaya',
+      'your_booking_was_successful': 'Tempahan anda\nberjaya',
+      'booking_success_desc': 'Tempahan berjaya! Permintaan anda telah diproses. Jika ada pertanyaan, hubungi sokongan kami. Terima kasih menggunakan perkhidmatan kami!',
+      'proceed_homepage': 'Teruskan ke laman utama',
     },
     'Mandarin': {
       // --- Auth ---
@@ -538,6 +552,13 @@ class AppTranslations {
       'confirm': '确认',
       'booking_success': '预订成功！',
       'booking_history': '预约记录',
+
+      // --- Booking Success Screen ---
+      'booking_successful_title': '预订成功',
+      'booking_successful_subtitle': '您的预订已获批准并成功',
+      'your_booking_was_successful': '您的预订\n成功',
+      'booking_success_desc': '预订成功！您的请求已处理。如果您有任何问题或需要进一步的帮助，请随时联系我们的支持团队。感谢您使用我们的服务！',
+      'proceed_homepage': '前往主页',
     },
   };
 }
