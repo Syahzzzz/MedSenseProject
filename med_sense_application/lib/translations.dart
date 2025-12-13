@@ -97,6 +97,7 @@ class AppTranslations {
       'Scaling': 'Scaling',
       'Whitening': 'Whitening',
       'Retainers': 'Retainers',
+      'Others': 'Others',
 
       // --- Service Details (Titles) ---
       'metal_student': 'Metal Conventional (Student Jimat Plan)',
@@ -272,6 +273,7 @@ class AppTranslations {
       'Scaling': 'Cuci Gigi',
       'Whitening': 'Pemutihan',
       'Retainers': 'Retainer',
+      'Others': 'Lain-lain',
 
       // --- Service Details ---
       'metal_student': 'Logam Konvensional (Pelan Jimat Pelajar)',
@@ -446,6 +448,7 @@ class AppTranslations {
       'Scaling': '洗牙',
       'Whitening': '美白',
       'Retainers': '保持器',
+      'Others': '其他',
 
       // --- Service Details ---
       'metal_student': '传统金属牙套 (学生优惠)',

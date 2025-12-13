@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dashboard.dart';
 import 'translations.dart';
 import 'review_confirm_view.dart';
@@ -42,37 +43,41 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
     },
   ];
 
-  // --- Dynamic Doctor Database (Mapped by Clinic ID + Service Type) ---
-  final Map<String, Map<String, Map<String, String>>> _doctorDatabase = {
-    'rawang': {
-      'Braces': {'name': 'Dr. Sarah Smith', 'role': 'Orthodontist'},
-      'Scaling': {'name': 'Dr. John Doe', 'role': 'Senior Surgeon'},
-      'Whitening': {'name': 'Dr. Sarah Smith', 'role': 'Aesthetic Dentist'},
-      'Retainers': {'name': 'Dr. John Doe', 'role': 'General Dentist'},
-    },
-    'selayang': {
-      'Braces': {'name': 'Dr. Emily Wong', 'role': 'Orthodontist'},
-      'Scaling': {'name': 'Dr. Michael Tan', 'role': 'Dental Surgeon'},
-      'Whitening': {'name': 'Dr. Emily Wong', 'role': 'Aesthetic Specialist'},
-      'Retainers': {'name': 'Dr. Michael Tan', 'role': 'General Dentist'},
-    },
-    'kl': {
-      'Braces': {'name': 'Dr. David Lee', 'role': 'Senior Orthodontist'},
-      'Scaling': {'name': 'Dr. Jessica Lim', 'role': 'Oral Surgeon'},
-      'Whitening': {'name': 'Dr. Jessica Lim', 'role': 'Cosmetic Dentist'},
-      'Retainers': {'name': 'Dr. David Lee', 'role': 'General Dentist'},
-    },
-  };
-
   // --- State ---
   int _selectedClinicIndex = 0; // Default to first clinic
   DateTime _selectedDate = DateTime.now();
   String? _selectedTime;
+  List<Map<String, dynamic>> _allDoctors = [];
+  bool _isLoading = true;
   
   final List<String> _timeSlots = [
     '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', 
     '11:00 AM', '02:00 PM', '02:30 PM', '03:00 PM', '04:00 PM'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDoctors();
+  }
+
+  Future<void> _fetchDoctors() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('Doctor')
+          .select('name, specialization');
+      
+      if (mounted) {
+        setState(() {
+          _allDoctors = List<Map<String, dynamic>>.from(response);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching doctors: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   // Helper to determine the service category key
   String _getServiceKey() {
@@ -86,14 +91,34 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
     return 'Scaling'; // Default
   }
 
-  // Get the correct doctor based on current Clinic AND Service
+  // Get the correct doctor based on Service (matching specialization)
   Map<String, String> _getDoctorInfo() {
+    if (_isLoading) return {'name': 'Loading...', 'role': '...'};
+    if (_allDoctors.isEmpty) return {'name': 'Dr. Available', 'role': 'General Dentist'};
+
     final String serviceKey = _getServiceKey();
-    final String clinicId = _clinics[_selectedClinicIndex]['id'];
     
-    // Fetch doctor or fallback
-    return _doctorDatabase[clinicId]?[serviceKey] ?? 
-           {'name': 'Dr. Available', 'role': 'General Dentist'};
+    // Find best match
+    try {
+      final match = _allDoctors.firstWhere((doc) {
+        final String spec = (doc['specialization'] as String? ?? '').toLowerCase();
+        final String sKey = serviceKey.toLowerCase();
+        
+        if (sKey == 'braces' && (spec.contains('ortho') || spec.contains('braces'))) return true;
+        if (sKey == 'scaling' && (spec.contains('surgeon') || spec.contains('general') || spec.contains('hygienist'))) return true;
+        if (sKey == 'whitening' && (spec.contains('aesthetic') || spec.contains('cosmetic') || spec.contains('general'))) return true;
+        if (sKey == 'retainers' && (spec.contains('ortho') || spec.contains('general'))) return true;
+        
+        return false;
+      }, orElse: () => _allDoctors.first);
+      
+      return {
+        'name': match['name'] as String? ?? 'Dr. Available',
+        'role': match['specialization'] as String? ?? 'Dentist',
+      };
+    } catch (e) {
+      return {'name': 'Dr. Available', 'role': 'General Dentist'};
+    }
   }
 
   void _handleBack() {

@@ -34,7 +34,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   Map<String, List<Map<String, String>>> _servicesData = {};
 
   // --- Data Constants ---
-  final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers'];
+  final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers', 'Others'];
 
   List<Map<String, String>> get _doctors => [
     {'name': 'Dr. Sarah Smith', 'specialization': AppTranslations.get('dentist_ortho'), 'image': 'images/sarah.png'},
@@ -81,6 +81,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         'Scaling': [],
         'Whitening': [],
         'Retainers': [],
+        'Others': [],
       };
 
       for (var item in response) {
@@ -96,7 +97,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         String descriptionText = rawDescription;
 
         // Basic categorization logic based on keywords
-        String category = 'Other';
+        String category = 'Others';
         if (name.contains('Braces') || name.contains('Invisalign') || name.contains('Retainer Bond')) {
           category = 'Braces';
         } else if (name.contains('Scaling') || name.contains('Polishing') || name.contains('Cleaning') || name.contains('Periodontal')) {

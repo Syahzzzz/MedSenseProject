@@ -13,7 +13,7 @@ class ServicesView extends StatefulWidget {
 
 class _ServicesViewState extends State<ServicesView> {
   String _selectedCategory = 'Braces';
-  final List<String> _categories = ['Braces', 'Scaling', 'Whitening', 'Retainers'];
+  final List<String> _categories = ['Braces', 'Scaling', 'Whitening', 'Retainers', 'Others'];
   
   bool _isLoading = true;
   Map<String, List<Map<String, String>>> _servicesData = {};
@@ -41,6 +41,7 @@ class _ServicesViewState extends State<ServicesView> {
         'Scaling': [],
         'Whitening': [],
         'Retainers': [],
+        'Others': [],
       };
 
       for (var item in response) {
@@ -55,7 +56,7 @@ class _ServicesViewState extends State<ServicesView> {
         // Use raw description directly
         String descriptionText = rawDescription;
 
-        String category = 'Other';
+        String category = 'Others';
         if (name.contains('Braces') || name.contains('Invisalign') || name.contains('Retainer Bond')) {
           category = 'Braces';
         } else if (name.contains('Scaling') || name.contains('Polishing') || name.contains('Cleaning') || name.contains('Periodontal')) {

@@ -28,7 +28,6 @@ class _ChatScreenState extends State<ChatScreen> {
   
   // Bot variables
   final List<Map<String, dynamic>> _botMessages = [];
-  final String fastApiUrl = "http://10.0.2.2:8000/api/botsense";
   
   // Human Chat Stream
   Stream<List<Map<String, dynamic>>>? _messageStream;
@@ -134,9 +133,25 @@ class _ChatScreenState extends State<ChatScreen> {
         // 'sent_at': automatic default
         // 'message_id': automatic default
       });
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        // Specific handling for the Foreign Key error to guide the user
+        if (e.code == '23503') {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("System Error: Database restricts sending to this user type. Please contact admin."),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error: ${e.message}"), backgroundColor: Colors.red)
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
-        // This will catch the Foreign Key violation if you haven't fixed the DB constraint
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error sending: $e")));
       }
     }
@@ -236,7 +251,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final displayMessages = messages.reversed.toList();
 
         return ListView.builder(
-          reverse: true, // FIX: Only one 'reverse' parameter now
+          reverse: true, 
           padding: const EdgeInsets.all(8),
           itemCount: displayMessages.length,
           itemBuilder: (context, index) {

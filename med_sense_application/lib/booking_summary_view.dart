@@ -29,6 +29,14 @@ class BookingSummaryView extends StatelessWidget {
     }
   }
 
+  double _parsePrice(String priceStr) {
+    try {
+      return double.parse(priceStr.replaceAll(RegExp(r'[^0-9.]'), ''));
+    } catch (e) {
+      return 0.0;
+    }
+  }
+
   // Helper to parse the description from DB into a breakdown list
   List<Map<String, String>> _getBreakdown() {
     List<Map<String, String>> items = [];
@@ -50,29 +58,47 @@ class BookingSummaryView extends StatelessWidget {
       }
     }
 
-    // 2. Fall back to standard breakdown if explicit items aren't found in text
-    if (items.isEmpty) {
-      if (serviceTitle.contains("Scaling")) {
-        items = [
-          {'item': 'Consultation & Diagnosis', 'price': 'RM 50'},
-          {'item': 'Procedure Fee', 'price': price}, // Use actual DB price
-        ];
-      } else if (serviceTitle.contains("Braces")) {
-        items = [
-          {'item': 'Consultation & X-ray', 'price': 'RM 200'},
-          {'item': 'Braces Deposit/Fee', 'price': price}, // Use actual DB price
-        ];
-      } else if (serviceTitle.contains("Whitening")) {
-        items = [
-          {'item': 'Dental Assessment', 'price': 'RM 50'},
-          {'item': 'Whitening Kit/Procedure', 'price': price}, // Use actual DB price
-        ];
-      } else {
-        items = [
-          {'item': 'Consultation', 'price': 'RM 50'},
-          {'item': 'Procedure', 'price': price}, // Use actual DB price
-        ];
-      }
+    if (items.isNotEmpty) return items;
+
+    // 2. Calculation logic based on total price
+    double total = _parsePrice(price);
+    
+    if (serviceTitle.contains("Scaling")) {
+      double consult = 50;
+      double procedure = total - consult;
+      if (procedure < 0) { consult = 0; procedure = total; }
+      
+      items = [
+        {'item': 'Consultation & Diagnosis', 'price': 'RM ${consult.toStringAsFixed(0)}'},
+        {'item': 'Procedure Fee', 'price': 'RM ${procedure.toStringAsFixed(0)}'},
+      ];
+    } else if (serviceTitle.contains("Braces") || serviceTitle.contains("Metal") || serviceTitle.contains("Ceramic")) {
+      double consult = 200;
+      double procedure = total - consult;
+      if (procedure < 0) { consult = 0; procedure = total; }
+      
+      items = [
+        {'item': 'Consultation & X-ray', 'price': 'RM ${consult.toStringAsFixed(0)}'},
+        {'item': 'Braces Deposit/Fee', 'price': 'RM ${procedure.toStringAsFixed(0)}'},
+      ];
+    } else if (serviceTitle.contains("Whitening")) {
+      double assessment = 50;
+      double procedure = total - assessment;
+      if (procedure < 0) { assessment = 0; procedure = total; }
+      
+      items = [
+        {'item': 'Dental Assessment', 'price': 'RM ${assessment.toStringAsFixed(0)}'},
+        {'item': 'Whitening Kit/Procedure', 'price': 'RM ${procedure.toStringAsFixed(0)}'},
+      ];
+    } else {
+      double consult = 50;
+      double procedure = total - consult;
+      if (procedure < 0) { consult = 0; procedure = total; }
+
+      items = [
+        {'item': 'Consultation', 'price': 'RM ${consult.toStringAsFixed(0)}'},
+        {'item': 'Procedure', 'price': 'RM ${procedure.toStringAsFixed(0)}'},
+      ];
     }
     
     return items;

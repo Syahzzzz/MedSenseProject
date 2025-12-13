@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart'; 
-import 'staff_message_view.dart'; // Import Messages View
+import 'staff_message_view.dart'; 
+import 'debug_message_view.dart'; // Import Debug View
 
 class StaffDashboard extends StatefulWidget {
   final String? staffName;
@@ -53,6 +54,16 @@ class _StaffDashboardState extends State<StaffDashboard> {
         backgroundColor: Colors.blueGrey.shade800,
         foregroundColor: Colors.white,
         actions: [
+          // DEBUG BUTTON - Click this to check message IDs
+          IconButton(
+            icon: const Icon(Icons.bug_report, color: Colors.orange),
+            onPressed: () {
+              Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => const DebugMessageView())
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,

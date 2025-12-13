@@ -56,6 +56,15 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
     );
   }
 
+  // --- Helper to parse "RM 123" to 123.0 ---
+  double _parsePrice(String priceStr) {
+    try {
+      return double.parse(priceStr.replaceAll(RegExp(r'[^0-9.]'), ''));
+    } catch (e) {
+      return 0.0;
+    }
+  }
+
   // --- Helper to get breakdown items based on service name ---
   List<Map<String, String>> _getBreakdown(String serviceName) {
     // 1. Try to parse explicit lines from description if they exist (backward compatibility)
@@ -66,7 +75,6 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
       line = line.trim();
       if (line.isEmpty) continue;
       
-      // If line contains price indicators
       if (line.startsWith('Price:') || line.startsWith('Deposit:') || line.startsWith('Monthly:')) {
         final parts = line.split(':');
         if (parts.length >= 2) {
@@ -78,43 +86,58 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
       }
     }
 
-    if (items.isNotEmpty) {
-      return items;
-    }
+    if (items.isNotEmpty) return items;
 
-    // 2. Fall back to using the passed 'servicePrice' (which comes from DB) in standard templates
+    // 2. Calculation logic based on total price
+    double total = _parsePrice(widget.servicePrice);
+
     if (serviceName.contains("Scaling")) {
+      double consult = 50;
+      double procedure = total - consult;
+      if (procedure < 0) { consult = 0; procedure = total; }
+      
       return [
-        {'item': 'Consultation & Diagnosis', 'price': 'RM 50'},
-        {'item': 'Procedure Fee', 'price': widget.servicePrice}, // Use DB price
-        {'item': 'Medication (if applicable)', 'price': 'RM 30'},
-        {'item': 'Follow-up appointment', 'price': 'Free'},
+        {'item': 'Consultation & Diagnosis', 'price': 'RM ${consult.toStringAsFixed(0)}'},
+        {'item': 'Procedure Fee', 'price': 'RM ${procedure.toStringAsFixed(0)}'},
+        {'item': 'Medication (if applicable)', 'price': 'Pay at venue'},
       ];
     }
+    
     // Braces logic
     if (serviceName.contains("Metal") || serviceName.contains("Ceramic") || serviceName.contains("Braces")) {
+      double consult = 200;
+      double deposit = total - consult;
+      if (deposit < 0) { consult = 0; deposit = total; }
+
       return [
-        {'item': 'Braces consultation\nXray\nMoulding', 'price': 'RM 200'},
-        {'item': 'Scaling & polishing\nUpper braces', 'price': widget.servicePrice}, // Use DB price
-        {'item': 'Lower braces\nMonthly payment', 'price': 'RM 150'},
-        {'item': 'Extraction/filling (if needed)', 'price': 'RM 120'},
-        {'item': 'Braces removal and retainer', 'price': 'RM 700'},
-        {'item': 'Bond bracket (per bracket)', 'price': 'RM 60'},
+        {'item': 'Consultation & X-ray', 'price': 'RM ${consult.toStringAsFixed(0)}'},
+        {'item': 'Braces Deposit/Fee', 'price': 'RM ${deposit.toStringAsFixed(0)}'},
+        {'item': 'Monthly payment', 'price': 'From RM 150'},
+        {'item': 'Retainer (end of treatment)', 'price': 'Pay at venue'},
       ];
     }
+    
     // Whitening logic
     if (serviceName.contains("Whitening")) {
+      double assessment = 50;
+      double procedure = total - assessment;
+      if (procedure < 0) { assessment = 0; procedure = total; }
+      
       return [
-        {'item': 'Dental Assessment', 'price': 'RM 50'},
-        {'item': 'Whitening Procedure', 'price': widget.servicePrice}, // Use DB price
-        {'item': 'Take-home Kit', 'price': 'RM 150'},
-        {'item': 'Desensitizing Gel', 'price': 'Free'},
+        {'item': 'Dental Assessment', 'price': 'RM ${assessment.toStringAsFixed(0)}'},
+        {'item': 'Whitening Procedure', 'price': 'RM ${procedure.toStringAsFixed(0)}'},
+        {'item': 'Take-home Kit', 'price': 'Included'},
       ];
     }
+    
     // Default fallback
+    double consult = 50;
+    double procedure = total - consult;
+    if (procedure < 0) { consult = 0; procedure = total; }
+
     return [
-      {'item': 'Consultation', 'price': 'RM 50'},
-      {'item': 'Procedure', 'price': widget.servicePrice}, // Use DB price
+      {'item': 'Consultation', 'price': 'RM ${consult.toStringAsFixed(0)}'},
+      {'item': 'Procedure', 'price': 'RM ${procedure.toStringAsFixed(0)}'},
     ];
   }
 
