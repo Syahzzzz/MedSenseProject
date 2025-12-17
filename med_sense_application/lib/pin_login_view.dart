@@ -97,86 +97,110 @@ class _PinLoginViewState extends State<PinLoginView> {
       body: SafeArea(
         child: _isLoading
             ? Center(child: CircularProgressIndicator(color: _primaryYellow))
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            : Stack(
+                fit: StackFit.expand,
                 children: [
-                  const SizedBox(height: 50),
-                  const Icon(Icons.lock_outline, size: 60, color: Colors.black87),
-                  const SizedBox(height: 20),
-                  Text(
-                    AppTranslations.get('welcome_title'), // "Good to See You Again!"
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "Enter your Quick Access PIN",
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // PIN Dots
-                  Row(
+                  Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(6, (index) {
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 8),
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: index < _enteredPin.length
-                              ? _primaryYellow
-                              : Colors.grey[300],
-                        ),
-                      );
-                    }),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Error Message
-                  if (_errorMessage.isNotEmpty)
-                    Text(
-                      _errorMessage,
-                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                    )
-                  else
-                    const SizedBox(height: 20),
+                    children: [
+                      const SizedBox(height: 50),
+                      const Icon(Icons.lock_outline, size: 60, color: Colors.black87),
+                      const SizedBox(height: 20),
+                      Text(
+                        AppTranslations.get('welcome_title'), // "Good to See You Again!"
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        "Enter your Quick Access PIN",
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                      const SizedBox(height: 40),
 
-                  const Spacer(),
-
-                  // Number Pad
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                    child: Column(
-                      children: [
-                        _buildRow('1', '2', '3'),
-                        const SizedBox(height: 20),
-                        _buildRow('4', '5', '6'),
-                        const SizedBox(height: 20),
-                        _buildRow('7', '8', '9'),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            TextButton(
-                              onPressed: _handleLogout,
-                              child: const Text(
-                                "Forgot?", 
-                                style: TextStyle(color: Colors.grey, fontSize: 14)
-                              ),
+                      // PIN Dots
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(6, (index) {
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: index < _enteredPin.length
+                                  ? _primaryYellow
+                                  : Colors.grey[300],
                             ),
-                            _buildDigitButton('0'),
-                            IconButton(
-                              onPressed: _onDeletePress,
-                              icon: const Icon(Icons.backspace_outlined, size: 28, color: Colors.black54),
+                          );
+                        }),
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Error Message
+                      if (_errorMessage.isNotEmpty)
+                        Text(
+                          _errorMessage,
+                          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                        )
+                      else
+                        const SizedBox(height: 20),
+
+                      const Spacer(),
+
+                      // Number Pad
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                        child: Column(
+                          children: [
+                            _buildRow('1', '2', '3'),
+                            const SizedBox(height: 20),
+                            _buildRow('4', '5', '6'),
+                            const SizedBox(height: 20),
+                            _buildRow('7', '8', '9'),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                TextButton(
+                                  onPressed: _handleLogout,
+                                  child: const Text(
+                                    "Forgot?", 
+                                    style: TextStyle(color: Colors.grey, fontSize: 14)
+                                  ),
+                                ),
+                                _buildDigitButton('0'),
+                                IconButton(
+                                  onPressed: _onDeletePress,
+                                  icon: const Icon(Icons.backspace_outlined, size: 28, color: Colors.black54),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 16,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: _handleLogout,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey.withValues(alpha: 0.1),
+                          ),
+                          child: const Icon(Icons.close, size: 30, color: Colors.black),
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 30),
                 ],
               ),
       ),

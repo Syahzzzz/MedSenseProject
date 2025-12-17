@@ -38,6 +38,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   bool _isDoctorsLoading = true;
   List<Map<String, dynamic>> _topDoctors = [];
 
+  // Appointment Data
+  bool _isAppointmentLoading = true;
+  Map<String, dynamic>? _upcomingAppointment;
+
   // --- Data Constants ---
   final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers', 'Others'];
 
@@ -48,6 +52,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     _loadUserProfile();
     _fetchServices(); 
     _fetchTopDoctors();
+    _fetchUpcomingAppointment(); // Added
     
     _chatAnimationController = AnimationController(
       vsync: this,
@@ -63,6 +68,50 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   void dispose() {
     _chatAnimationController.dispose();
     super.dispose();
+  }
+
+  // --- Fetch Appointment ---
+  Future<void> _fetchUpcomingAppointment() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isAppointmentLoading = false);
+      return;
+    }
+
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+
+      // 1. Auto-expire past appointments
+      // Update any 'Confirmed' appointment that is in the past to 'Expired'
+      await _supabase
+          .from('Appointment')
+          .update({'status': 'Expired'})
+          .eq('patient_id', user.id)
+          .eq('status', 'Confirmed')
+          .lt('appointment_datetime', now);
+
+      // 2. Fetch ONE upcoming appointment
+      // We check where appointment_datetime >= NOW (UTC)
+      final response = await _supabase
+          .from('Appointment')
+          .select('*, Service(service_name), Doctor(name, specialization)')
+          .eq('patient_id', user.id)
+          .eq('status', 'Confirmed') // Only confirmed ones
+          .gte('appointment_datetime', now)
+          .order('appointment_datetime', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _upcomingAppointment = response;
+          _isAppointmentLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching upcoming appointment: $e');
+      if (mounted) setState(() => _isAppointmentLoading = false);
+    }
   }
 
   // --- Fetch Services from Supabase ---
@@ -315,6 +364,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     await Future.wait([
       _fetchServices(),
       _fetchTopDoctors(),
+      _fetchUpcomingAppointment(),
     ]);
   }
 
@@ -424,6 +474,77 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
 
   Widget _buildAppointmentBanner() {
+    if (_isAppointmentLoading) {
+      return Container(
+         height: 150,
+         width: double.infinity,
+         decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(20)),
+         child: const Center(child: CircularProgressIndicator(color: Color(0xFFFBC02D))),
+      );
+    }
+
+    if (_upcomingAppointment == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withValues(alpha: 0.1),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+             const Icon(Icons.calendar_month_outlined, size: 40, color: Color(0xFFFBC02D)),
+             const SizedBox(height: 10),
+             const Text(
+               "No Upcoming Appointments",
+               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+             ),
+             const SizedBox(height: 5),
+             Text(
+               "Book your next dental visit today!",
+               style: TextStyle(color: Colors.grey[600], fontSize: 12),
+             ),
+          ],
+        ),
+      );
+    }
+
+    final apt = _upcomingAppointment!;
+    final service = apt['Service'] as Map<String, dynamic>? ?? {};
+    final doctor = apt['Doctor'] as Map<String, dynamic>? ?? {};
+    final serviceName = service['service_name'] ?? 'General Consultation';
+    final doctorName = doctor['name'] ?? 'Available Doctor';
+    final specialization = doctor['specialization'] ?? AppTranslations.get('dentist');
+
+    // Parse Date (Stored as UTC ISO, convert to Local)
+    final dtStr = apt['appointment_datetime'] as String;
+    final dt = DateTime.parse(dtStr).toLocal();
+    
+    final List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final dateStr = "${dt.day} ${months[dt.month-1]} ${dt.year}";
+    
+    int hour = dt.hour;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour == 0) hour = 12;
+    final minuteStr = dt.minute.toString().padLeft(2, '0');
+    final timeStr = "$hour:$minuteStr $amPm";
+
+    // Simple image logic
+    String imageAsset = 'images/john.png';
+    if (doctorName.toLowerCase().contains('sarah') || doctorName.toLowerCase().contains('jane') || doctorName.toLowerCase().contains('fatimah')) {
+      imageAsset = 'images/sarah.png';
+    }
+
     return Container(
       padding: const EdgeInsets.all(20), 
       decoration: BoxDecoration(
@@ -445,19 +566,22 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             mainAxisAlignment: MainAxisAlignment.spaceBetween, 
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start, 
-                children: [
-                  Text(AppTranslations.get('Scaling'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
-                      const SizedBox(width: 4),
-                      Text(AppTranslations.get('dental_clinic_rawang'), style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, 
+                  children: [
+                    Text(serviceName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        // Assuming location is static for now, or could be fetched from clinic if stored
+                        Text(AppTranslations.get('dental_clinic_rawang'), style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), 
@@ -481,15 +605,15 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               color: Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                SizedBox(width: 8),
-                Text("24 Nov 2025", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                SizedBox(width: 15), 
-                Icon(Icons.access_time, size: 16, color: Colors.grey),
-                SizedBox(width: 8),
-                Text("10:00 AM", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(dateStr, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 15), 
+                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(timeStr, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -503,21 +627,21 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               CircleAvatar(
                 radius: 20,
                 backgroundColor: Colors.grey[200],
-                backgroundImage: const AssetImage('images/sarah.png'), 
+                backgroundImage: AssetImage(imageAsset), 
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Dr. Sarah Smith",
-                    style: TextStyle(
+                  Text(
+                    doctorName,
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
-                    AppTranslations.get('dentist'), 
+                    specialization, 
                     style: const TextStyle(
                       fontSize: 12,
                       color: Colors.grey,

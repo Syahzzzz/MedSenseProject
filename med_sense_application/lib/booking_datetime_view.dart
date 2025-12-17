@@ -132,6 +132,40 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
     }
   }
 
+  // --- Helper to check if time slot is in the future ---
+  bool _isTimeSlotAvailable(String timeSlot) {
+    final now = DateTime.now();
+    // Compare dates strictly (ignoring time)
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+
+    if (selected.isAfter(today)) {
+      return true; // Future date: all slots open
+    }
+    if (selected.isBefore(today)) {
+      return false; // Past date: no slots
+    }
+
+    // It's Today: Check time
+    try {
+      final parts = timeSlot.split(' '); // e.g. ["09:00", "AM"]
+      final timeParts = parts[0].split(':'); // ["09", "00"]
+      int hour = int.parse(timeParts[0]);
+      int minute = int.parse(timeParts[1]);
+      final amPm = parts[1];
+
+      if (amPm == 'PM' && hour != 12) hour += 12;
+      if (amPm == 'AM' && hour == 12) hour = 0;
+
+      final slotDateTime = DateTime(now.year, now.month, now.day, hour, minute);
+      
+      // Return true if slot is in the future
+      return slotDateTime.isAfter(now);
+    } catch (e) {
+      return true; // Fallback
+    }
+  }
+
   // --- Location Selection Modal ---
   void _showLocationPicker() {
     showModalBottomSheet(
@@ -396,6 +430,10 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                       onDateChanged: (date) {
                         setState(() {
                           _selectedDate = date;
+                          // Check if selected time is still valid, else clear it
+                          if (_selectedTime != null && !_isTimeSlotAvailable(_selectedTime!)) {
+                            _selectedTime = null;
+                          }
                         });
                       },
                     ),
@@ -409,33 +447,66 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 15),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 12,
-                    children: _timeSlots.map((time) {
-                      bool isSelected = _selectedTime == time;
-                      return ChoiceChip(
-                        label: Text(time),
-                        selected: isSelected,
-                        selectedColor: primaryYellow,
-                        backgroundColor: Colors.white,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(
-                            color: isSelected ? Colors.transparent : Colors.grey.shade300,
+                  Builder(
+                    builder: (context) {
+                      final availableSlots = _timeSlots.where((time) => _isTimeSlotAvailable(time)).toList();
+                      
+                      if (availableSlots.isEmpty) {
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.grey[300]!),
                           ),
-                        ),
-                        onSelected: (selected) {
-                          setState(() {
-                            _selectedTime = selected ? time : null;
-                          });
-                        },
+                          child: Column(
+                            children: [
+                              const Icon(Icons.access_time_filled, color: Colors.grey, size: 40),
+                              const SizedBox(height: 10),
+                              const Text(
+                                "No slots available",
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                "Please select another date.",
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 12,
+                        children: availableSlots.map((time) {
+                          bool isSelected = _selectedTime == time;
+                          return ChoiceChip(
+                            label: Text(time),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFFFBC02D),
+                            backgroundColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                color: isSelected ? Colors.transparent : Colors.grey.shade300,
+                              ),
+                            ),
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedTime = selected ? time : null;
+                              });
+                            },
+                          );
+                        }).toList(),
                       );
-                    }).toList(),
+                    }
                   ),
                 ],
               ),

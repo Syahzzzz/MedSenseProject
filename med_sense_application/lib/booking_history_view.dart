@@ -108,12 +108,24 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
                     final booking = _bookings[index];
                     final service = booking['Service'] as Map<String, dynamic>? ?? {};
                     final doctor = booking['Doctor'] as Map<String, dynamic>? ?? {};
-                    final status = booking['status'] as String? ?? 'Unknown';
+                    String status = booking['status'] as String? ?? 'Unknown';
+
+                    // Check for expiration based on local device time
+                    try {
+                      final appointmentDateTime = DateTime.parse(booking['appointment_datetime']).toLocal();
+                      if (appointmentDateTime.isBefore(DateTime.now()) && 
+                          (status.toLowerCase() == 'confirmed' || status.toLowerCase() == 'pending')) {
+                        status = 'Expired';
+                      }
+                    } catch (e) {
+                      // Keep original status if parsing fails
+                    }
 
                     Color statusColor = Colors.grey;
                     if (status.toLowerCase() == 'confirmed') statusColor = Colors.green;
                     if (status.toLowerCase() == 'pending') statusColor = Colors.orange;
                     if (status.toLowerCase() == 'cancelled') statusColor = Colors.red;
+                    if (status.toLowerCase() == 'expired') statusColor = Colors.grey.shade700;
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 16),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'translations.dart';
-import 'booking_success_view.dart'; // Import the new success view
+import 'booking_success_view.dart';
+import 'online_banking_view.dart'; // Import Online Banking View
 
 class ReviewConfirmView extends StatefulWidget {
   final String clinicNameKey;
@@ -33,15 +35,58 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = false;
   String _paymentMethod = 'Credit/debit'; // Default
+  String? _savedCardNumber;
   // Theme Color
   final Color _primaryYellow = const Color(0xFFFBC02D);
 
   @override
   void initState() {
     super.initState();
+    _loadSavedCard();
+  }
+
+  Future<void> _loadSavedCard() async {
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final suffix = user.email ?? '';
+      final cardNumber = prefs.getString('card_number_$suffix');
+      
+      if (cardNumber != null && cardNumber.isNotEmpty) {
+        setState(() {
+          // Basic masking
+          final clean = cardNumber.replaceAll(' ', '');
+          if (clean.length > 4) {
+             _savedCardNumber = "**** **** **** ${clean.substring(clean.length - 4)}";
+          } else {
+             _savedCardNumber = cardNumber;
+          }
+        });
+      }
+    }
   }
 
   Future<void> _handleConfirm() async {
+    // Check if Online Banking is selected
+    // Note: _paymentMethod holds the label (translated string) set in _buildPaymentOption
+    final String onlineBankingLabel = AppTranslations.get('online_banking');
+    
+    if (_paymentMethod == onlineBankingLabel) {
+       Navigator.push(
+         context, 
+         MaterialPageRoute(
+           builder: (context) => OnlineBankingView(
+             clinicNameKey: widget.clinicNameKey,
+             serviceName: widget.serviceName,
+             doctorName: widget.doctorName,
+             date: widget.date,
+             time: widget.time,
+           )
+         )
+       );
+       return; 
+    }
+
     setState(() => _isLoading = true);
     final user = _supabase.auth.currentUser;
 
@@ -80,7 +125,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
         'patient_id': user.id,
         'doctor_id': doctorId,
         'service_id': serviceId,
-        'appointment_datetime': fullDateTime.toIso8601String(),
+        'appointment_datetime': fullDateTime.toUtc().toIso8601String(),
         'status': 'Confirmed', 
         'predicted_wait_time_minutes': 0, 
       });
@@ -502,6 +547,8 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
 
   Widget _buildPaymentOption(String label, IconData icon) {
     final bool isSelected = _paymentMethod == label;
+    final bool isCreditDebit = label == AppTranslations.get('credit_debit');
+
     return GestureDetector(
       onTap: () => setState(() => _paymentMethod = label),
       child: Container(
@@ -519,8 +566,19 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
               child: Icon(icon, color: Colors.black54, size: 20),
             ),
             const SizedBox(width: 15),
-            Text(label, style: const TextStyle(fontSize: 15, color: Colors.black87)),
-            const Spacer(),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+                  if (isCreditDebit && _savedCardNumber != null)
+                    Text(
+                      _savedCardNumber!,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
+            ),
             if (isSelected)
               const Icon(Icons.check_circle, color: Colors.black, size: 24),
           ],

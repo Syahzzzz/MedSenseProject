@@ -24,6 +24,7 @@ class _LoginPageState extends State<LoginPage> {
   // --- State Variables ---
   bool _rememberMe = false;
   bool _obscurePassword = true; 
+  String? _storedPin;
 
   final Color _primaryYellow = const Color(0xFFFBC02D);
   final Color _lightYellowInput = const Color(0xFFFFF9C4);
@@ -59,6 +60,9 @@ class _LoginPageState extends State<LoginPage> {
           final String? storedPin = prefs.getString('quick_pin_$savedUid');
           if (storedPin != null && storedPin.isNotEmpty && mounted) {
             // Show PIN Dialog immediately
+            setState(() {
+              _storedPin = storedPin;
+            });
             _showPinDialog(storedPin, savedEmail, savedPassword);
           }
         }
@@ -304,6 +308,23 @@ class _LoginPageState extends State<LoginPage> {
                             : Text(AppTranslations.get('login'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                     ),
+
+                    if (_storedPin != null) ...[
+                      const SizedBox(height: 15),
+                      TextButton.icon(
+                        onPressed: () {
+                           if (_storedPin != null) {
+                              _showPinDialog(_storedPin!, _emailController.text, _passwordController.text);
+                           }
+                        },
+                        icon: const Icon(Icons.dialpad, size: 20),
+                        label: const Text("Enter Quick PIN"),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey[700],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 30),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -454,12 +475,24 @@ class _PinEntryWidgetState extends State<_PinEntryWidget> {
       padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
       child: Column(
         children: [
-          Container(
-            width: 50,
-            height: 5,
-            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 50,
+                height: 5,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
           const Icon(Icons.lock_open_rounded, size: 50, color: Color(0xFFFBC02D)),
           const SizedBox(height: 20),
           Text(

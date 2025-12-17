@@ -23,7 +23,13 @@ class BookingSuccessView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: () => Navigator.pop(context), // Should ideally go back or home? Usually success goes home.
+                    onTap: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (context) => const DashboardPage()),
+                        (route) => false,
+                      );
+                    },
                     child: const Icon(Icons.arrow_back, color: Colors.black54, size: 28),
                   ),
                   const SizedBox(height: 30),
