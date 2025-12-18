@@ -126,7 +126,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
         'doctor_id': doctorId,
         'service_id': serviceId,
         'appointment_datetime': fullDateTime.toUtc().toIso8601String(),
-        'status': 'Confirmed', 
+        'status': 'Pending', 
         'predicted_wait_time_minutes': 0, 
       });
 

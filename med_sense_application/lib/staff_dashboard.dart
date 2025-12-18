@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart'; 
 import 'staff_message_view.dart'; 
 import 'debug_message_view.dart'; // Import Debug View
+import 'staff_services_management_view.dart';
+import 'staff_appointments_view.dart';
 
 class StaffDashboard extends StatefulWidget {
   final String? staffName;
@@ -48,11 +50,15 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    const Color primaryYellow = Color(0xFFFBC02D);
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Staff Dashboard'),
-        backgroundColor: Colors.blueGrey.shade800,
-        foregroundColor: Colors.white,
+        title: const Text('Staff Dashboard', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           // DEBUG BUTTON - Click this to check message IDs
           IconButton(
@@ -65,7 +71,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
             onPressed: _logout,
           ),
         ],
@@ -74,7 +80,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.medical_services, size: 100, color: Colors.blueGrey),
+            const Icon(Icons.medical_services, size: 100, color: primaryYellow),
             const SizedBox(height: 20),
             Text(
               "Welcome, $_displayName",
@@ -83,7 +89,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
             const SizedBox(height: 5),
             Text(
               _displayRole.toUpperCase(),
-              style: TextStyle(fontSize: 14, color: Colors.blueGrey.shade700, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.bold, letterSpacing: 1.2),
             ),
             const SizedBox(height: 10),
             const Text(
@@ -98,19 +104,42 @@ class _StaffDashboardState extends State<StaffDashboard> {
               runSpacing: 20,
               alignment: WrapAlignment.center,
               children: [
-                _buildStaffAction(Icons.list_alt, "View Queue", () {}),
-                _buildStaffAction(Icons.person_add, "Register Patient", () {}),
-                _buildStaffAction(Icons.calendar_today, "Appointments", () {}),
-                _buildStaffAction(Icons.chat, "Messages", () {
-                  // Navigate to Staff Messages
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const StaffMessagesView()),
-                  );
-                }),
-                // Only show Settings if admin
-                if (widget.isAdmin == true)
-                  _buildStaffAction(Icons.settings, "Settings", () {}),
+                if (widget.isAdmin == true) ...[
+                  _buildStaffAction(Icons.edit_note, "Add/Edit Service", () {
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(builder: (context) => const StaffServicesManagementView())
+                    );
+                  }),
+                  _buildStaffAction(Icons.chat, "Messages", () {
+                     Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const StaffMessagesView()),
+                    );
+                  }),
+                  _buildStaffAction(Icons.calendar_today, "Appointments", () {
+                     Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
+                    );
+                  }),
+                  _buildStaffAction(Icons.manage_accounts, "Reg/Edit Staff", () {}),
+                  _buildStaffAction(Icons.list_alt, "View Queue", () {}),
+                ] else ...[
+                  _buildStaffAction(Icons.calendar_today, "Appointments", () {
+                     Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
+                    );
+                  }),
+                  _buildStaffAction(Icons.chat, "Messages", () {
+                     Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const StaffMessagesView()),
+                    );
+                  }),
+                  _buildStaffAction(Icons.list_alt, "View Queue", () {}),
+                ]
               ],
             ),
           ],
@@ -136,19 +165,19 @@ class _StaffDashboardState extends State<StaffDashboard> {
               spreadRadius: 2,
             )
           ],
-          border: Border.all(color: Colors.blueGrey.shade100),
+          border: Border.all(color: Colors.grey.shade200),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.blueGrey.shade800, size: 30),
+            Icon(icon, color: const Color(0xFFFBC02D), size: 30),
             const SizedBox(height: 10),
             Text(
               label, 
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontWeight: FontWeight.bold, 
-                color: Colors.blueGrey.shade900,
+                color: Colors.black87,
                 fontSize: 13
               )
             ),

@@ -96,7 +96,7 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
         'doctor_id': doctorId,
         'service_id': serviceId,
         'appointment_datetime': fullDateTime.toUtc().toIso8601String(),
-        'status': 'Confirmed', 
+        'status': 'Pending', 
         'predicted_wait_time_minutes': 0, 
       });
 

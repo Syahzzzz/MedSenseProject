@@ -10,6 +10,8 @@ import 'translations.dart';
 import 'chat_screen.dart'; 
 import 'staff_selection_view.dart'; // Imported Staff Selection
 import 'booking_history_view.dart';
+import 'notification_view.dart';
+import 'notification_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -42,6 +44,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   bool _isAppointmentLoading = true;
   Map<String, dynamic>? _upcomingAppointment;
 
+  // Notifications
+  int _unreadNotificationsCount = 0;
+  RealtimeChannel? _notificationChannel;
+
   // --- Data Constants ---
   final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers', 'Others'];
 
@@ -49,10 +55,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+    _initializeNotifications();
     _loadUserProfile();
     _fetchServices(); 
     _fetchTopDoctors();
     _fetchUpcomingAppointment(); // Added
+    _fetchUnreadNotificationsCount();
     
     _chatAnimationController = AnimationController(
       vsync: this,
@@ -66,8 +74,69 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   @override
   void dispose() {
+    _notificationChannel?.unsubscribe();
     _chatAnimationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeNotifications() async {
+    await NotificationService().init();
+    _setupRealtimeSubscription();
+  }
+
+  void _setupRealtimeSubscription() {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    _notificationChannel = _supabase.channel('public:Notification:${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'Notification',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'recipient_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            final newRecord = payload.newRecord;
+            if (newRecord.isNotEmpty) {
+              final message = newRecord['message_content'] as String? ?? 'New Notification';
+              
+              // Show Local Notification
+              NotificationService().showNotification(
+                DateTime.now().millisecondsSinceEpoch ~/ 1000, 
+                'MedSense', 
+                message
+              );
+
+              // Update badge count
+              _fetchUnreadNotificationsCount();
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _fetchUnreadNotificationsCount() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final response = await _supabase
+          .from('Notification')
+          .count(CountOption.exact)
+          .eq('recipient_id', user.id)
+          .eq('is_read', false);
+
+      if (mounted) {
+        setState(() {
+          _unreadNotificationsCount = response;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching notification count: $e');
+    }
   }
 
   // --- Fetch Appointment ---
@@ -365,6 +434,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       _fetchServices(),
       _fetchTopDoctors(),
       _fetchUpcomingAppointment(),
+      _fetchUnreadNotificationsCount(),
     ]);
   }
 
@@ -417,6 +487,33 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         ),
         Row(
           children: [
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: Colors.black54),
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationView()));
+                    _fetchUnreadNotificationsCount(); // Refresh count on return
+                  },
+                ),
+                if (_unreadNotificationsCount > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 8,
+                        minHeight: 8,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             IconButton(
               icon: const Icon(Icons.history, color: Colors.black54),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingHistoryView())),
