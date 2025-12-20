@@ -189,97 +189,105 @@ class _ServicesViewState extends State<ServicesView> {
                         itemCount: _servicesData[_selectedCategory]?.length ?? 0,
                         itemBuilder: (context, index) {
                           final service = _servicesData[_selectedCategory]![index];
-                          return Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 15.0),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            service['title']!,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            "- ${service['duration']}",
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[800],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          if (service['raw_desc']!.isNotEmpty && service['raw_desc'] != service['title'])
-                                             Text(
-                                              service['raw_desc']!,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[500],
-                                                fontStyle: FontStyle.italic
-                                              ),
-                                            ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            service['price']!,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[700],
-                                              fontWeight: FontWeight.w600
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    
-                                    const SizedBox(width: 10),
-
-                                    SizedBox(
-                                      height: 36,
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => BookingSummaryView(
-                                                serviceCategory: AppTranslations.get(_selectedCategory),
-                                                serviceTitle: service['title']!,
-                                                price: service['price']!,
-                                                duration: service['duration']!,
-                                                description: service['full_desc']!, 
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: primaryYellow,
-                                          foregroundColor: Colors.black,
-                                          elevation: 0,
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          "Book",
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16.0),
+                            padding: const EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withValues(alpha: 0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
-                              ),
-                              const Divider(color: Colors.grey, thickness: 0.5),
-                            ],
+                              ],
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        service['title']!,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "- ${service['duration']}",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[800],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (service['raw_desc']!.isNotEmpty && service['raw_desc'] != service['title'])
+                                         Text(
+                                          service['raw_desc']!,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[500],
+                                            fontStyle: FontStyle.italic
+                                          ),
+                                        ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        service['price']!,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.teal[700],
+                                          fontWeight: FontWeight.w700
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                const SizedBox(width: 10),
+
+                                SizedBox(
+                                  height: 40,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => BookingSummaryView(
+                                            serviceCategory: AppTranslations.get(_selectedCategory),
+                                            serviceTitle: service['title']!,
+                                            price: service['price']!,
+                                            duration: service['duration']!,
+                                            description: service['full_desc']!, 
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryYellow,
+                                      foregroundColor: Colors.black,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "BOOK",
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),

@@ -7,7 +7,7 @@ class BookingSuccessView extends StatelessWidget {
 
   // Color Constants matching the image
   final Color _yellowColor = const Color(0xFFFBC02D);
-  final Color _checkIconColor = const Color(0xFFFFB300);
+  final Color _checkIconColor = Colors.green;
 
   @override
   Widget build(BuildContext context) {
@@ -18,45 +18,19 @@ class BookingSuccessView extends StatelessWidget {
           children: [
             // Top Section
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (context) => const DashboardPage()),
-                        (route) => false,
-                      );
-                    },
-                    child: const Icon(Icons.arrow_back, color: Colors.black54, size: 28),
-                  ),
-                  const SizedBox(height: 30),
-                  Center(
-                    child: Column(
-                      children: [
-                        Text(
-                          AppTranslations.get('booking_successful_title'), // "Booking successfully"
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900, // Very bold
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          AppTranslations.get('booking_successful_subtitle'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.black.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DashboardPage()),
+                      (route) => false,
+                    );
+                  },
+                  child: const Icon(Icons.close, color: Colors.black54, size: 28),
+                ),
               ),
             ),
 
@@ -113,9 +87,9 @@ class BookingSuccessView extends StatelessWidget {
                         Text(
                           AppTranslations.get('booking_success_desc'),
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 14,
-                            color: Colors.grey[400],
+                            color: Colors.black54,
                             height: 1.5,
                             fontWeight: FontWeight.w500
                           ),

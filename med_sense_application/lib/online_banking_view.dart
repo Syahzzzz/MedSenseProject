@@ -97,6 +97,8 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
         'service_id': serviceId,
         'appointment_datetime': fullDateTime.toUtc().toIso8601String(),
         'status': 'Pending', 
+        'payment_status': 'Paid',
+        'payment_method': 'Online Banking',
         'predicted_wait_time_minutes': 0, 
       });
 

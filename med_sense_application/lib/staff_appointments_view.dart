@@ -62,10 +62,31 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
   }
 
   Future<void> _updateStatus(String appointmentId, String newStatus) async {
+    // Check if currently Cancelled
+    final currentApt = _appointments.firstWhere((a) => a['appointment_id'] == appointmentId, orElse: () => {});
+    if (currentApt.isNotEmpty && currentApt['status'] == 'Cancelled') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot change status. Appointment is already cancelled and refund processed.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
+      final updates = {'status': newStatus};
+      
+      // If cancelling, set payment status to Refunded
+      if (newStatus == 'Cancelled') {
+        updates['payment_status'] = 'Refunded';
+      }
+
       await _supabase
           .from('Appointment')
-          .update({'status': newStatus})
+          .update(updates)
           .eq('appointment_id', appointmentId);
 
       // Send Notification if Cancelled
@@ -109,6 +130,9 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
       if (index != -1) {
         setState(() {
           _appointments[index]['status'] = newStatus;
+          if (newStatus == 'Cancelled') {
+             _appointments[index]['payment_status'] = 'Refunded';
+          }
         });
       }
 
@@ -122,6 +146,36 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error updating status: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updatePaymentStatus(String appointmentId, String newPaymentStatus) async {
+    try {
+      await _supabase
+          .from('Appointment')
+          .update({'payment_status': newPaymentStatus})
+          .eq('appointment_id', appointmentId);
+
+      // Refresh list locally
+      final index = _appointments.indexWhere((a) => a['appointment_id'] == appointmentId);
+      if (index != -1) {
+        setState(() {
+          _appointments[index]['payment_status'] = newPaymentStatus;
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment status updated to $newPaymentStatus')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating payment status: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating payment status: $e')),
         );
       }
     }
@@ -221,6 +275,8 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
     final doctorName = apt['Doctor']?['name'] ?? 'Assigned Doctor';
     final serviceName = apt['Service']?['service_name'] ?? 'General Service';
     final status = apt['status'] ?? 'Unknown';
+    final paymentStatus = apt['payment_status'] ?? 'Unpaid'; // Default Unpaid
+    final paymentMethod = apt['payment_method'] ?? 'Unknown Method';
     
     // Date Formatting
     final dt = DateTime.parse(apt['appointment_datetime']).toLocal();
@@ -247,6 +303,8 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
       default: statusColor = Colors.grey;
     }
 
+    Color paymentColor = paymentStatus == 'Paid' ? Colors.green : Colors.red;
+
     return Card(
       color: Colors.white,
       elevation: 2,
@@ -268,17 +326,36 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
                     Text("$dateStr • $timeStr", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.5)),
-                  ),
-                  child: Text(
-                    displayStatus.toUpperCase(), 
-                    style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)
-                  ),
+                Row(
+                  children: [
+                    // Payment Status Badge
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: paymentColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: paymentColor.withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        paymentStatus.toUpperCase(), 
+                        style: TextStyle(color: paymentColor, fontSize: 10, fontWeight: FontWeight.bold)
+                      ),
+                    ),
+                    // Appointment Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        displayStatus.toUpperCase(), 
+                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -301,6 +378,17 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
                       Text(serviceName, style: TextStyle(color: Colors.grey[800], fontSize: 14)),
                       const SizedBox(height: 2),
                       Text(" $doctorName", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                      const SizedBox(height: 4),
+                      Row(
+                         children: [
+                           Icon(Icons.payment, size: 14, color: Colors.grey[600]),
+                           const SizedBox(width: 4),
+                           Text(
+                             paymentMethod, 
+                             style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic)
+                           ),
+                         ],
+                      ),
                     ],
                   ),
                 ),
@@ -311,114 +399,408 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
                   onSelected: (value) {
                     if (value == 'FollowUp') {
                       _createFollowUp(apt);
+                    } else if (value == 'MarkPaid') {
+                      _updatePaymentStatus(apt['appointment_id'], 'Paid');
+                    } else if (value == 'MarkUnpaid') {
+                      _updatePaymentStatus(apt['appointment_id'], 'Unpaid');
                     } else {
                       _updateStatus(apt['appointment_id'], value);
                     }
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'Confirmed', child: Text('Mark Confirmed')),
-                    const PopupMenuItem(value: 'Completed', child: Text('Mark Completed')),
-                    const PopupMenuItem(value: 'Cancelled', child: Text('Cancel Appointment')),
-                    const PopupMenuItem(value: 'No Show', child: Text('No Show')),
-                    const PopupMenuDivider(),
-                    const PopupMenuItem(value: 'FollowUp', child: Text('Create Follow-up')),
-                  ],
+                  itemBuilder: (context) {
+                    final isCancelled = status == 'Cancelled';
+                    return [
+                      PopupMenuItem(
+                        value: 'Confirmed', 
+                        enabled: !isCancelled,
+                        child: const Text('Mark Confirmed'),
+                      ),
+                      PopupMenuItem(
+                        value: 'Completed', 
+                        enabled: !isCancelled,
+                        child: const Text('Mark Completed'),
+                      ),
+                      PopupMenuItem(
+                        value: 'Cancelled', 
+                        enabled: !isCancelled,
+                        child: const Text('Cancel Appointment'),
+                      ),
+                      PopupMenuItem(
+                        value: 'No Show', 
+                        enabled: !isCancelled,
+                        child: const Text('No Show'),
+                      ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'MarkPaid', 
+                        enabled: !isCancelled,
+                        child: const Text('Mark as Paid'),
+                      ),
+                      PopupMenuItem(
+                        value: 'MarkUnpaid', 
+                        enabled: !isCancelled,
+                        child: const Text('Mark as Unpaid'),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(value: 'FollowUp', child: Text('Create Follow-up')),
+                    ];
+                  },
                 ),
               ],
             ),
+            
+            // Inline History Tree View
+            _buildTimelineWidget(apt),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _createFollowUp(Map<String, dynamic> sourceApt) async {
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)), // Suggest next month
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: _primaryYellow),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (pickedDate == null) return;
-
-    if (!mounted) return;
-    final TimeOfDay? pickedTime = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: _primaryYellow),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (pickedTime == null) return;
-
-    final DateTime finalDateTime = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
-    );
-
-    if (!mounted) return;
-
-    final String formattedTime = pickedTime.format(context);
-
-    setState(() => _isLoading = true);
-
-    try {
-      final String patientId = sourceApt['patient_id'];
-      final String? doctorId = sourceApt['doctor_id'];
-      final String? serviceId = sourceApt['service_id'];
-      final String serviceName = sourceApt['Service']?['service_name'] ?? 'Service';
-
-      // 1. Insert New Appointment
-      await _supabase.from('Appointment').insert({
-        'patient_id': patientId,
-        'doctor_id': doctorId,
-        'service_id': serviceId,
-        'appointment_datetime': finalDateTime.toIso8601String(),
-        'status': 'Confirmed', // Auto-confirm staff created appointments
-        'predicted_wait_time_minutes': 0,
-      });
-
-      // 2. Send Notification
-      final dateStr = "${finalDateTime.day}/${finalDateTime.month}/${finalDateTime.year}";
-      
-      await _supabase.from('Notification').insert({
-        'recipient_id': patientId,
-        'message_content': 'A follow-up appointment for $serviceName has been scheduled for $dateStr at $formattedTime by the clinic.',
-        'is_read': false,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Follow-up appointment created successfully')),
-        );
-        await _fetchAppointments(); // Refresh list
-      }
-    } catch (e) {
-      debugPrint('Error creating follow-up: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating follow-up: $e')),
-        );
+  Widget _buildTimelineWidget(Map<String, dynamic> currentApt) {
+    // 1. Find Ancestors
+    List<Map<String, dynamic>> chain = [];
+    String? prevId = currentApt['previous_appointment_id'];
+    
+    // Safety break to prevent infinite loops in bad data
+    int depth = 0;
+    while (prevId != null && depth < 10) {
+      final ancestorIndex = _appointments.indexWhere((a) => a['appointment_id'] == prevId);
+      if (ancestorIndex != -1) {
+        final ancestor = _appointments[ancestorIndex];
+        chain.insert(0, ancestor); // Add to beginning (oldest first)
+        prevId = ancestor['previous_appointment_id'];
+        depth++;
+      } else {
+        break; // Ancestor not found in loaded list
       }
     }
+
+    if (chain.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 24),
+        const Text(
+          "Appointment History",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54),
+        ),
+        const SizedBox(height: 12),
+        ...chain.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          
+          final dt = DateTime.parse(item['appointment_datetime']).toLocal();
+          final dateStr = "${dt.day}/${dt.month}/${dt.year}";
+          final serviceName = item['Service']?['service_name'] ?? 'Service';
+          final status = item['status'] ?? 'Unknown';
+
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey[300],
+                        border: Border.all(color: Colors.grey[500]!),
+                      ),
+                    ),
+                    if (index < chain.length - 1 || true) // Draw line to next or current
+                      Expanded(
+                        child: Container(
+                          width: 2,
+                          color: Colors.grey[300],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "$dateStr - $serviceName",
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87),
+                        ),
+                        Text(
+                          "Status: $status",
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        // Connection to current (The "This Appointment" indicator)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+             Column(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _primaryYellow,
+                      border: Border.all(color: Colors.black),
+                    ),
+                  ),
+                ],
+             ),
+             const SizedBox(width: 12),
+             const Text("This Appointment", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontStyle: FontStyle.italic)),
+          ],
+        )
+      ],
+    );
   }
+
+  Future<void> _createFollowUp(Map<String, dynamic> sourceApt) async {
+    DateTime? selectedDate = DateTime.now().add(const Duration(days: 30));
+    TimeOfDay? selectedTime = const TimeOfDay(hour: 9, minute: 0);
+    final TextEditingController notesController = TextEditingController();
+    final TextEditingController priceController = TextEditingController();
+    
+    // Fetch Doctors
+    List<Map<String, dynamic>> doctors = [];
+    String? selectedDoctorId = sourceApt['doctor_id']; // Default to current doctor
+    try {
+      final docRes = await _supabase.from('Doctor').select('doctor_id, name').order('name');
+      doctors = List<Map<String, dynamic>>.from(docRes);
+      
+      // Ensure selectedDoctorId exists in the list, otherwise default to first or null
+      if (selectedDoctorId != null && !doctors.any((d) => d['doctor_id'] == selectedDoctorId)) {
+         selectedDoctorId = doctors.isNotEmpty ? doctors.first['doctor_id'] : null;
+      }
+    } catch (e) {
+      debugPrint("Error fetching doctors: $e");
+    }
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final dateStr = "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}";
+            final timeStr = selectedTime!.format(context);
+
+            return AlertDialog(
+              title: const Text("Create Follow-up"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Select Doctor:", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedDoctorId,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      items: doctors.map((doc) {
+                        return DropdownMenuItem<String>(
+                          value: doc['doctor_id'],
+                          child: Text(doc['name'] ?? 'Unknown'),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setState(() => selectedDoctorId = val),
+                    ),
+                    const SizedBox(height: 15),
+                    const Text("Select Date & Time:", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    ListTile(
+                      title: Text(dateStr),
+                      leading: const Icon(Icons.calendar_today),
+                      tileColor: Colors.grey[100],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate!,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          builder: (context, child) => Theme(
+                            data: Theme.of(context).copyWith(colorScheme: ColorScheme.light(primary: _primaryYellow)),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) setState(() => selectedDate = picked);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    ListTile(
+                      title: Text(timeStr),
+                      leading: const Icon(Icons.access_time),
+                      tileColor: Colors.grey[100],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: selectedTime!,
+                          builder: (context, child) => Theme(
+                            data: Theme.of(context).copyWith(colorScheme: ColorScheme.light(primary: _primaryYellow)),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) setState(() => selectedTime = picked);
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    const Text("Custom Price (Optional):", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                    TextField(
+                      controller: priceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        hintText: "Enter price (RM)",
+                        prefixText: "RM ",
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text("Reason / Notes:", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                    TextField(
+                      controller: notesController,
+                      decoration: InputDecoration(
+                        hintText: "E.g., Check braces progress...",
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryYellow,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: const Text("Create"),
+                  onPressed: () {
+                    // Close dialog and proceed
+                     Navigator.of(context).pop(true);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((confirmed) async {
+       if (confirmed == true) {
+          final DateTime finalDateTime = DateTime(
+            selectedDate!.year,
+            selectedDate!.month,
+            selectedDate!.day,
+            selectedTime!.hour,
+            selectedTime!.minute,
+          );
+
+          if (!mounted) return;
+          final String formattedTime = selectedTime!.format(context);
+          final String notes = notesController.text.trim();
+          final String priceStr = priceController.text.trim();
+          double? customPrice;
+          if (priceStr.isNotEmpty) {
+             customPrice = double.tryParse(priceStr);
+          }
+
+          setState(() => _isLoading = true);
+
+          try {
+            final String patientId = sourceApt['patient_id'];
+            // Use selected doctor ID
+            final String? doctorId = selectedDoctorId;
+            final String? serviceId = sourceApt['service_id'];
+            final String serviceName = sourceApt['Service']?['service_name'] ?? 'Service';
+
+            // 1. Insert New Appointment
+            await _supabase.from('Appointment').insert({
+              'patient_id': patientId,
+              'doctor_id': doctorId,
+              'service_id': serviceId,
+              'appointment_datetime': finalDateTime.toIso8601String(),
+              'status': 'Confirmed', // Auto-confirm staff created appointments
+              'payment_status': 'Unpaid', // Default for follow-ups
+              'payment_method': 'Pay at Venue', // Default for follow-ups
+              'previous_appointment_id': sourceApt['appointment_id'], // Link to source
+              'predicted_wait_time_minutes': 0,
+              'notes': notes,
+              'custom_price': customPrice,
+            });
+
+            // 2. Send Notification
+            final dateStr = "${finalDateTime.day}/${finalDateTime.month}/${finalDateTime.year}";
+            String msg = 'A follow-up appointment for $serviceName has been scheduled for $dateStr at $formattedTime by the clinic.';
+            if (notes.isNotEmpty) {
+              msg += ' Reason: $notes';
+            }
+            if (customPrice != null) {
+              msg += ' Price: RM $customPrice';
+            }
+            
+            await _supabase.from('Notification').insert({
+              'recipient_id': patientId,
+              'message_content': msg,
+              'is_read': false,
+            });
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Follow-up appointment created successfully')),
+              );
+              await _fetchAppointments(); // Refresh list
+            }
+          } catch (e) {
+            debugPrint('Error creating follow-up: $e');
+            if (mounted) {
+              setState(() => _isLoading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error creating follow-up: $e')),
+              );
+            }
+          }
+       }
+    });
+  }
+
+
 }

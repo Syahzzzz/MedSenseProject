@@ -108,7 +108,7 @@ class BookingSummaryView extends StatelessWidget {
   Widget build(BuildContext context) {
     // Application Theme Yellow
     const Color backgroundColor = Color(0xFFFBC02D); 
-    const Color cardYellow = Color(0xFFFFF9C4); 
+    const Color cardColor = Colors.white; 
 
     final List<Map<String, String>> breakdown = _getBreakdown();
 
@@ -135,7 +135,7 @@ class BookingSummaryView extends StatelessWidget {
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
-                color: cardYellow,
+                color: cardColor,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(30),
                   topRight: Radius.circular(30),

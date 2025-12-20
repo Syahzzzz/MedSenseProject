@@ -8,12 +8,18 @@ CREATE TABLE public.Appointment (
   service_id uuid,
   appointment_datetime timestamp with time zone NOT NULL,
   status character varying NOT NULL,
+  payment_status character varying DEFAULT 'Unpaid',
+  payment_method character varying,
+  notes text,
+  custom_price numeric,
+  previous_appointment_id uuid,
   predicted_wait_time_minutes integer,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT Appointment_pkey PRIMARY KEY (appointment_id),
   CONSTRAINT Appointment_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.Patient(patient_id),
   CONSTRAINT Appointment_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES public.Doctor(doctor_id),
-  CONSTRAINT Appointment_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.Service(service_id)
+  CONSTRAINT Appointment_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.Service(service_id),
+  CONSTRAINT Appointment_previous_appointment_id_fkey FOREIGN KEY (previous_appointment_id) REFERENCES public.Appointment(appointment_id)
 );
 CREATE TABLE public.Doctor (
   doctor_id uuid NOT NULL DEFAULT gen_random_uuid(),

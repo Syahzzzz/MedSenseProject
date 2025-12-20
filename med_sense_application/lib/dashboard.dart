@@ -26,15 +26,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   String _userName = "User"; 
   String? _avatarUrl; 
   int _selectedIndex = 0; 
-  String _selectedServiceCategory = 'Braces';
 
   // Chat Expansion State
   bool _isChatExpanded = false;
   late AnimationController _chatAnimationController;
-
-  // Dynamic Services Data
-  bool _isServicesLoading = true;
-  Map<String, List<Map<String, String>>> _servicesData = {};
 
   // Doctors Data
   bool _isDoctorsLoading = true;
@@ -48,16 +43,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   int _unreadNotificationsCount = 0;
   RealtimeChannel? _notificationChannel;
 
-  // --- Data Constants ---
-  final List<String> _serviceCategories = ['Braces', 'Scaling', 'Whitening', 'Retainers', 'Others'];
-
   // --- Lifecycle ---
   @override
   void initState() {
     super.initState();
     _initializeNotifications();
     _loadUserProfile();
-    _fetchServices(); 
     _fetchTopDoctors();
     _fetchUpcomingAppointment(); // Added
     _fetchUnreadNotificationsCount();
@@ -180,73 +171,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     } catch (e) {
       debugPrint('Error fetching upcoming appointment: $e');
       if (mounted) setState(() => _isAppointmentLoading = false);
-    }
-  }
-
-  // --- Fetch Services from Supabase ---
-  Future<void> _fetchServices() async {
-    if (!mounted) return;
-    setState(() => _isServicesLoading = true);
-    
-    try {
-      // Fetch services from DB, now including the 'price' column
-      final List<dynamic> response = await _supabase
-          .from('Service') 
-          .select('service_name, description, estimated_duration_minutes, price')
-          .order('service_name', ascending: true);
-
-      final Map<String, List<Map<String, String>>> categorized = {
-        'Braces': [],
-        'Scaling': [],
-        'Whitening': [],
-        'Retainers': [],
-        'Others': [],
-      };
-
-      for (var item in response) {
-        final String name = item['service_name'] as String;
-        final String rawDescription = item['description'] as String? ?? '';
-        final int duration = item['estimated_duration_minutes'] as int? ?? 0;
-        final num priceVal = item['price'] as num? ?? 0;
-        
-        // Format price
-        String priceText = "RM ${priceVal.toStringAsFixed(0)}"; 
-        
-        // Use description directly as it likely no longer contains price metadata
-        String descriptionText = rawDescription;
-
-        // Basic categorization logic based on keywords
-        String category = 'Others';
-        if (name.contains('Braces') || name.contains('Invisalign') || name.contains('Retainer Bond')) {
-          category = 'Braces';
-        } else if (name.contains('Scaling') || name.contains('Polishing') || name.contains('Cleaning') || name.contains('Periodontal')) {
-          category = 'Scaling';
-        } else if (name.contains('Whitening') || name.contains('Bleaching')) {
-          category = 'Whitening';
-        } else if (name.contains('Retainer') && !name.contains('Bond')) {
-          category = 'Retainers';
-        } 
-
-        if (categorized.containsKey(category)) {
-          categorized[category]!.add({
-            'title': name,
-            'duration': 'Est. $duration mins',
-            'price': priceText,
-            'raw_desc': descriptionText,
-            'full_desc': rawDescription,
-          });
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _servicesData = categorized;
-          _isServicesLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading services for dashboard: $e');
-      if (mounted) setState(() => _isServicesLoading = false);
     }
   }
 
@@ -431,7 +355,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   Future<void> _refreshDashboard() async {
     _loadUserProfile();
     await Future.wait([
-      _fetchServices(),
       _fetchTopDoctors(),
       _fetchUpcomingAppointment(),
       _fetchUnreadNotificationsCount(),
@@ -456,16 +379,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               const SizedBox(height: 15),
               
               _buildAppointmentBanner(),
-              const SizedBox(height: 30),
-              
-              _buildServicesSection(),
-              const SizedBox(height: 20),
-              
-              // Show loading or the list
-              _isServicesLoading 
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFFBC02D)))
-                  : _buildServicesList(),
-                  
               const SizedBox(height: 30),
               
               _buildDoctorsSection(),
@@ -750,84 +663,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           ),
         ],
       )
-    );
-  }
-
-  Widget _buildServicesSection() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, 
-          children: [
-            Text(AppTranslations.get('services'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesView())), 
-              child: Text(AppTranslations.get('view_all'), style: const TextStyle(fontWeight: FontWeight.bold))
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal, 
-          child: Row(
-            children: _serviceCategories.map((cat) => 
-              GestureDetector(
-                onTap: () => setState(() => _selectedServiceCategory = cat), 
-                child: Container(
-                  margin: const EdgeInsets.only(right: 10), 
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), 
-                  decoration: BoxDecoration(
-                    color: _selectedServiceCategory == cat ? const Color(0xFFFBC02D) : const Color(0xFFFFF59D), 
-                    borderRadius: BorderRadius.circular(20)
-                  ), 
-                  child: Text(AppTranslations.get(cat), style: const TextStyle(fontWeight: FontWeight.bold))
-                )
-              )
-            ).toList()
-          )
-        ),
-      ],
-    );
-  }
-
-  Widget _buildServicesList() {
-    final currentServices = _servicesData[_selectedServiceCategory] ?? [];
-    
-    if (currentServices.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Center(child: Text("No services available for $_selectedServiceCategory")),
-      );
-    }
-
-    return Column(
-      children: currentServices.map((s) => Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2))
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              s['title']!, 
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)
-            ), 
-            const SizedBox(height: 4),
-            Text(
-              "- ${s['duration']!}", 
-              style: TextStyle(color: Colors.grey[800], fontSize: 13)
-            ),
-            const SizedBox(height: 8),
-            Text(
-              s['price']!, 
-              style: TextStyle(color: Colors.grey[600], fontSize: 13)
-            ),
-          ],
-        ),
-      )).toList()
     );
   }
 

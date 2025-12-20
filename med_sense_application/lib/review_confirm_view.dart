@@ -120,6 +120,12 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
       // 3. Combine Date & Time
       final DateTime fullDateTime = _parseDateTime(widget.date, widget.time);
 
+      // Determine Payment Status
+      String paymentStatus = 'Paid';
+      if (_paymentMethod == AppTranslations.get('pay_at_venue')) {
+        paymentStatus = 'Unpaid';
+      }
+
       // 4. Insert Appointment
       await _supabase.from('Appointment').insert({
         'patient_id': user.id,
@@ -127,6 +133,8 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
         'service_id': serviceId,
         'appointment_datetime': fullDateTime.toUtc().toIso8601String(),
         'status': 'Pending', 
+        'payment_status': paymentStatus,
+        'payment_method': _paymentMethod,
         'predicted_wait_time_minutes': 0, 
       });
 
@@ -481,6 +489,8 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                           _buildPaymentOption(AppTranslations.get('credit_debit'), Icons.credit_card),
                           const SizedBox(height: 12),
                           _buildPaymentOption(AppTranslations.get('online_banking'), Icons.account_balance),
+                          const SizedBox(height: 12),
+                          _buildPaymentOption(AppTranslations.get('pay_at_venue'), Icons.store),
                         ],
                       ),
                     ),

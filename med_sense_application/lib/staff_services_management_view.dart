@@ -23,6 +23,77 @@ class _StaffServicesManagementViewState extends State<StaffServicesManagementVie
     _fetchServices();
   }
 
+  Future<bool> _confirmDeletionWithPassword() async {
+    final codeCtrl = TextEditingController();
+    // Generate random 5-digit number
+    final String randomCode = (10000 + (DateTime.now().microsecondsSinceEpoch % 90000)).toString();
+
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Deletion"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("This action cannot be undone. To confirm, please enter the code below:"),
+            const SizedBox(height: 15),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey[400]!),
+                ),
+                child: Text(
+                  randomCode,
+                  style: const TextStyle(
+                    fontSize: 24, 
+                    fontWeight: FontWeight.bold, 
+                    letterSpacing: 5,
+                    color: Colors.black87
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: codeCtrl,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                labelText: 'Enter Code',
+                border: OutlineInputBorder(),
+                hintText: 'XXXXX'
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () {
+               if (codeCtrl.text.trim() == randomCode) {
+                 Navigator.pop(context, true);
+              } else {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text("Incorrect code. Please try again."), backgroundColor: Colors.red),
+                 );
+              }
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
   Future<void> _fetchServices() async {
     setState(() => _isLoading = true);
     try {
@@ -180,27 +251,11 @@ class _StaffServicesManagementViewState extends State<StaffServicesManagementVie
     );
   }
 
-  void _confirmDelete(String id, String name) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Service'),
-        content: Text('Are you sure you want to delete "$name"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteService(id);
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _confirmDelete(String id, String name) async {
+    final confirmed = await _confirmDeletionWithPassword();
+    if (confirmed) {
+      _deleteService(id);
+    }
   }
 
   @override
