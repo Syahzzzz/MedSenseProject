@@ -93,11 +93,17 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
   }
 
   Future<void> _handleCancellation() async {
+    final String currentStatus = widget.appointment['status'] ?? 'Pending';
+    final bool isPending = currentStatus.toLowerCase() == 'pending';
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Request Cancellation"),
-        content: const Text("Are you sure you want to cancel this appointment? This action cannot be undone."),
+        title: Text(isPending ? "Cancel Appointment" : "Request Cancellation"),
+        content: Text(isPending 
+          ? "Are you sure you want to cancel this appointment? This action cannot be undone."
+          : "Since this appointment is already confirmed, this will send a request to the clinic staff to cancel. Are you sure?"
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -105,7 +111,7 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Confirm Cancellation", style: TextStyle(color: Colors.red)),
+            child: Text(isPending ? "Confirm Cancellation" : "Submit Request", style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -115,21 +121,29 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
       setState(() => _isProcessing = true);
       try {
         final id = widget.appointment['appointment_id'];
+        
+        // If Pending -> Cancel Immediately
+        // If Confirmed -> Request Cancellation
+        final String newStatus = isPending ? 'Cancelled' : 'Cancellation Requested';
+
         await Supabase.instance.client
             .from('Appointment')
-            .update({'status': 'Cancelled'})
+            .update({'status': newStatus})
             .eq('appointment_id', id);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Appointment cancelled successfully.")),
+            SnackBar(content: Text(isPending 
+              ? "Appointment cancelled successfully." 
+              : "Cancellation request sent to staff.")
+            ),
           );
           Navigator.pop(context, true); // Return true to refresh list
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error cancelling: $e")),
+            SnackBar(content: Text("Error: $e")),
           );
         }
       } finally {
@@ -139,20 +153,126 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
   }
 
   Future<void> _handleRescheduling() async {
-     // For now, show a dialog as implementing full rescheduling flow requires date picking logic similar to booking flow
-    showDialog(
+    final String currentStatus = widget.appointment['status'] ?? 'Pending';
+    final bool isPending = currentStatus.toLowerCase() == 'pending';
+
+    // 1. Pick Date
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFFBC02D),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate == null) return;
+
+    // 2. Pick Time
+    if (!mounted) return;
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 9, minute: 0),
+      builder: (context, child) {
+         return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFFBC02D),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      }
+    );
+
+    if (pickedTime == null) return;
+
+    // 3. Confirm
+    if (!mounted) return;
+    final newDateTime = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute);
+    
+    // Check if within business hours (9AM - 5PM approx)
+    if (pickedTime.hour < 9 || pickedTime.hour > 17) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a time between 9:00 AM and 5:00 PM")));
+      return;
+    }
+
+    final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Request Rescheduling"),
-        content: const Text("To reschedule, please contact the clinic directly or cancel this appointment and book a new one."),
+        title: Text(isPending ? "Confirm Reschedule" : "Confirm Reschedule Request"),
+        content: Text(isPending 
+          ? "Reschedule appointment to:\n\n${newDateTime.toString().split('.')[0]}?"
+          : "Request to move appointment to:\n\n${newDateTime.toString().split('.')[0]}\n\nThis will be sent to staff for approval."
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFBC02D), foregroundColor: Colors.black),
+            child: Text(isPending ? "Confirm Change" : "Submit Request"),
           ),
         ],
       ),
     );
+
+    if (confirm == true) {
+      setState(() => _isProcessing = true);
+      try {
+        final id = widget.appointment['appointment_id'];
+        
+        if (isPending) {
+           // Immediate Update
+           await Supabase.instance.client
+            .from('Appointment')
+            .update({
+              'appointment_datetime': newDateTime.toUtc().toIso8601String(),
+              // Keep status as Pending
+            })
+            .eq('appointment_id', id);
+        } else {
+           // Request Mode
+           final currentNotes = widget.appointment['notes'] ?? '';
+           final newNote = "$currentNotes\n[Reschedule Request: ${newDateTime.toIso8601String()}]".trim();
+
+           await Supabase.instance.client
+            .from('Appointment')
+            .update({
+              'status': 'Reschedule Requested',
+              'notes': newNote, 
+            })
+            .eq('appointment_id', id);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(isPending 
+              ? "Appointment rescheduled successfully." 
+              : "Reschedule request sent successfully.")
+            ),
+          );
+          Navigator.pop(context, true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        }
+      } finally {
+        if (mounted) setState(() => _isProcessing = false);
+      }
+    }
   }
 
   @override
@@ -160,8 +280,15 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
     final apt = widget.appointment;
     final doctor = apt['Doctor'] as Map<String, dynamic>? ?? {};
     final service = apt['Service'] as Map<String, dynamic>? ?? {};
+    final patient = apt['Patient'] as Map<String, dynamic>? ?? {}; // Extract Patient Data
+
     final String serviceName = service['service_name'] ?? 'Service';
     final String doctorName = doctor['name'] ?? 'Unknown Doctor';
+    
+    // Patient Details
+    final String patientName = patient['name'] ?? 'Unknown Patient';
+    final String patientId = apt['patient_id']?.toString().substring(0, 8) ?? 'Unknown ID';
+
     final String dateStr = _formatDate(apt['appointment_datetime']);
     
     String priceDisplay = 'RM ${service['price'] ?? '0'}';
@@ -170,8 +297,18 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
     }
 
     final String status = apt['status'] ?? 'Pending';
-    final String paymentStatus = apt['payment_status'] ?? 'Unpaid';
+    String paymentStatus = apt['payment_status'] ?? 'Unpaid';
     final String notes = apt['notes'] ?? '';
+
+    // Logic for Payment Status Display on Cancellation
+    if (status.toLowerCase() == 'cancelled') {
+      final ps = paymentStatus.toLowerCase();
+      if (ps == 'paid' || ps.contains('deposit') || ps == 'refunded') {
+        paymentStatus = 'Refunded';
+      } else {
+        paymentStatus = 'Cancelled';
+      }
+    }
 
     // Calculate Breakdown
     final breakdown = _getBreakdown(serviceName, priceDisplay);
@@ -227,7 +364,15 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
                         ),
                         child: Column(
                           children: [
-                            const Icon(Icons.receipt_long, size: 40, color: Color(0xFFFBC02D)),
+                            SizedBox(
+                              height: 60,
+                              child: Image.asset(
+                                'images/logo.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(Icons.receipt_long, size: 40, color: Color(0xFFFBC02D)),
+                              ),
+                            ),
                             const SizedBox(height: 10),
                             Text(
                               serviceName.toUpperCase(),
@@ -253,11 +398,12 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildRow("Appointment ID", "#${apt['appointment_id'].toString().substring(0, 8)}..."),
-                              _buildRow("Status", status.toUpperCase(), isStatus: true),
-                              _buildRow("Doctor", doctorName),
-                              _buildRow("Location", "Rawang Clinic"), 
-                              
+                                                            _buildRow("Appointment ID", "#${apt['appointment_id'].toString().substring(0, 8)}..."),
+                                                            _buildRow("Patient Name", patientName),
+                                                            _buildRow("Patient ID", patientId),
+                                                            _buildRow("Status", status.toUpperCase(), isStatus: true),
+                                                            _buildRow("Doctor", doctorName),
+                                                            _buildRow("Location", "Rawang Clinic"),                                
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 20.0),
                                 child: Divider(),
@@ -333,6 +479,17 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
                                   ],
                                 ),
                               ),
+
+                              const SizedBox(height: 15),
+                              const Text(
+                                "* Cancellation Policy: Cancellations made up to 48 hours before the appointment are free. Cancellations made within 48 hours may incur a 5% processing fee on refunds.",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.red,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ],
                           ),
                         ),
@@ -394,12 +551,19 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
   Widget _buildRow(String label, String value, {bool isStatus = false, bool isBold = false}) {
     Color textColor = Colors.black87;
     if (isStatus) {
-      if (value.toLowerCase() == 'confirmed') {
-        textColor = Colors.green;
-      } else if (value.toLowerCase() == 'cancelled') {
-        textColor = Colors.red;
-      } else if (value.toLowerCase() == 'pending') {
-        textColor = Colors.orange;
+      switch (value.toLowerCase()) {
+        case 'confirmed':
+          textColor = Colors.green;
+        case 'pending':
+          textColor = Colors.orange;
+        case 'completed':
+          textColor = Colors.blue;
+        case 'cancelled':
+          textColor = Colors.red;
+        case 'expired':
+          textColor = Colors.grey;
+        default:
+          textColor = Colors.black87;
       }
     }
 

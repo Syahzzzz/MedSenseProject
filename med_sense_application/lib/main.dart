@@ -374,34 +374,24 @@ class _MyHomePageState extends State<MyHomePage> {
 
                       const SizedBox(height: 15),
 
-                      // --- Staff Login Button (DIRECT NAVIGATION) ---
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // Go directly to StaffLoginView without branch dialog
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const StaffLoginView(), 
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueGrey.shade800, // Distinct dark color for staff
-                            foregroundColor: Colors.white,
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
+                      const SizedBox(height: 10),
+
+                      // --- Staff Login Link ---
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const StaffLoginView(), 
                             ),
-                          ),
-                          child: Text(
-                            AppTranslations.get('login_staff'),
-                            style: const TextStyle(
-                              fontSize: 16, 
-                              fontWeight: FontWeight.bold
-                            ),
+                          );
+                        },
+                        child: Text(
+                          AppTranslations.get('login_staff'),
+                          style: TextStyle(
+                            color: Colors.blueGrey.shade600,
+                            decoration: TextDecoration.underline,
+                            fontSize: 14,
                           ),
                         ),
                       ),

@@ -319,14 +319,24 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 5),
-                    Text("$dateStr • $timeStr", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          "$dateStr • $timeStr",
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Payment Status Badge
                     Container(
@@ -383,9 +393,12 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
                          children: [
                            Icon(Icons.payment, size: 14, color: Colors.grey[600]),
                            const SizedBox(width: 4),
-                           Text(
-                             paymentMethod, 
-                             style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic)
+                           Expanded(
+                             child: Text(
+                               paymentMethod, 
+                               style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic),
+                               overflow: TextOverflow.ellipsis,
+                             ),
                            ),
                          ],
                       ),

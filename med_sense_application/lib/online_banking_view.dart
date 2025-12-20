@@ -26,24 +26,24 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
   final _supabase = Supabase.instance.client;
   bool _isProcessing = false;
 
-  final List<String> _banks = [
-    'Maybank (Maybank2u)',
-    'CIMB Bank (CIMB Clicks)',
-    'Public Bank (PBe / PB engage)',
-    'RHB Bank (RHB Now)',
-    'Hong Leong Bank (HLB Connect)',
-    'AmBank (AmOnline)',
-    'Bank Islam (GO by Bank Islam)',
-    'Bank Rakyat (i-Rakyat)',
-    'UOB (UOB Personal Internet Banking)',
-    'BSN (myBSN)',
-    'OCBC Bank (OCBC Online Banking)',
-    'Alliance Bank (allianceonline)',
-    'Standard Chartered',
-    'Affin Bank',
-    'Bank Muamalat',
-    'Agrobank',
-    'HSBC Bank',
+  final List<Map<String, String>> _banks = [
+    {'name': 'Maybank (Maybank2u)', 'image': 'images/banklogo/maybank.png'},
+    {'name': 'CIMB Bank (CIMB Clicks)', 'image': 'images/banklogo/cimbbank.png'},
+    {'name': 'Public Bank (PBe / PB engage)', 'image': 'images/banklogo/publicbank.png'},
+    {'name': 'RHB Bank (RHB Now)', 'image': 'images/banklogo/rhbbank.jpg'},
+    {'name': 'Hong Leong Bank (HLB Connect)', 'image': 'images/banklogo/heongleongbank.jpg'},
+    {'name': 'AmBank (AmOnline)', 'image': 'images/banklogo/ambank.png'},
+    {'name': 'Bank Islam (GO by Bank Islam)', 'image': 'images/banklogo/bankislam.png'},
+    {'name': 'Bank Rakyat (i-Rakyat)', 'image': 'images/banklogo/bankrakyat.png'},
+    {'name': 'UOB (UOB Personal Internet Banking)', 'image': 'images/banklogo/uobbank.jpg'},
+    {'name': 'BSN (myBSN)', 'image': 'images/banklogo/bsn.png'},
+    {'name': 'OCBC Bank (OCBC Online Banking)', 'image': 'images/banklogo/ocbcbank.jpg'},
+    {'name': 'Alliance Bank (allianceonline)', 'image': 'images/banklogo/alliance.jpg'},
+    {'name': 'Standard Chartered', 'image': 'images/banklogo/standardchartered.png'},
+    {'name': 'Affin Bank', 'image': 'images/banklogo/affin.png'},
+    {'name': 'Bank Muamalat', 'image': 'images/banklogo/muamalat.jpg'},
+    {'name': 'Agrobank', 'image': 'images/banklogo/agrobank.png'},
+    {'name': 'HSBC Bank', 'image': 'images/banklogo/hsbc.png'},
   ];
 
   Future<void> _handleBankSelection(String bankName) async {
@@ -98,7 +98,7 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
         'appointment_datetime': fullDateTime.toUtc().toIso8601String(),
         'status': 'Pending', 
         'payment_status': 'Paid',
-        'payment_method': 'Online Banking',
+        'payment_method': 'Online Banking ($bankName)',
         'predicted_wait_time_minutes': 0, 
       });
 
@@ -186,14 +186,22 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade200),
                         ),
-                        child: const Icon(Icons.account_balance, color: Colors.grey),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset(
+                            bank['image']!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_balance, color: Colors.grey),
+                          ),
+                        ),
                       ),
-                      title: Text(bank, style: const TextStyle(fontWeight: FontWeight.w500)),
+                      title: Text(bank['name']!, style: const TextStyle(fontWeight: FontWeight.w500)),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                      onTap: () => _handleBankSelection(bank),
+                      onTap: () => _handleBankSelection(bank['name']!),
                     );
                   },
                 ),

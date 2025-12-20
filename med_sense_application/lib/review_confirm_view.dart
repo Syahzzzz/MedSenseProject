@@ -269,6 +269,15 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
 
     final List<Map<String, String>> breakdown = _getBreakdown(widget.serviceName);
 
+    // Dynamic Pay Now / Pay at Venue Logic
+    String payNowAmount = priceDisplay;
+    String payAtVenueAmount = "RM 0";
+
+    if (_paymentMethod == AppTranslations.get('pay_at_venue')) {
+       payNowAmount = "RM 0";
+       payAtVenueAmount = priceDisplay;
+    }
+
     return Scaffold(
       backgroundColor: _primaryYellow, // Theme Yellow
       appBar: AppBar(
@@ -466,14 +475,14 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(AppTranslations.get('pay_now'), style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-                              Text(priceDisplay, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                              Text(payNowAmount, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
                             ],
                           ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(AppTranslations.get('pay_at_venue'), style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-                              Text("RM 0", style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                              Text(payAtVenueAmount, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
                             ],
                           ),
 

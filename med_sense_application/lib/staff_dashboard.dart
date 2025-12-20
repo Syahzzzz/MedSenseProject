@@ -6,6 +6,8 @@ import 'debug_message_view.dart'; // Import Debug View
 import 'staff_services_management_view.dart';
 import 'staff_appointments_view.dart';
 import 'staff_management_view.dart';
+import 'staff_requests_view.dart'; // Import Request View
+import 'staff_queue_view.dart'; // Import Queue View
 
 class StaffDashboard extends StatefulWidget {
   final String? staffName;
@@ -130,6 +132,12 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
                 );
               }),
+              _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StaffRequestsView()),
+                );
+              }),
               _buildStaffAction(Icons.edit_note, "Services Management", "Add, edit, or remove services", () {
                 Navigator.push(
                   context, 
@@ -148,12 +156,23 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   MaterialPageRoute(builder: (context) => const StaffManagementView()),
                 );
               }),
-              _buildStaffAction(Icons.list_alt, "Queue System", "Monitor live queue", () {}),
+              _buildStaffAction(Icons.list_alt, "Queue System", "Monitor live queue", () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StaffQueueView()),
+                );
+              }),
             ] else ...[
               _buildStaffAction(Icons.calendar_today, "Appointments", "View bookings", () {
                  Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
+                );
+              }),
+              _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StaffRequestsView()),
                 );
               }),
               _buildStaffAction(Icons.chat, "Messages", "Chat with patients", () {
@@ -162,7 +181,12 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   MaterialPageRoute(builder: (context) => const StaffMessagesView()),
                 );
               }),
-              _buildStaffAction(Icons.list_alt, "Queue View", "Monitor live queue", () {}),
+              _buildStaffAction(Icons.list_alt, "Queue View", "Monitor live queue", () {
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StaffQueueView()),
+                );
+              }),
             ]
           ],
         ),

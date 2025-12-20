@@ -8,13 +8,13 @@ CREATE TABLE public.Appointment (
   service_id uuid,
   appointment_datetime timestamp with time zone NOT NULL,
   status character varying NOT NULL,
-  payment_status character varying DEFAULT 'Unpaid',
-  payment_method character varying,
-  notes text,
-  custom_price numeric,
-  previous_appointment_id uuid,
   predicted_wait_time_minutes integer,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  payment_status text DEFAULT 'Unpaid'::text,
+  payment_method text,
+  notes text,
+  previous_appointment_id uuid,
+  custom_price numeric,
   CONSTRAINT Appointment_pkey PRIMARY KEY (appointment_id),
   CONSTRAINT Appointment_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.Patient(patient_id),
   CONSTRAINT Appointment_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES public.Doctor(doctor_id),
@@ -28,14 +28,6 @@ CREATE TABLE public.Doctor (
   name character varying,
   is_available boolean,
   CONSTRAINT Doctor_pkey PRIMARY KEY (doctor_id)
-);
-CREATE TABLE public.KnowledgeBase (
-  knowledge_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  category character varying NOT NULL,
-  question text NOT NULL,
-  answer text NOT NULL,
-  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT KnowledgeBase_pkey PRIMARY KEY (knowledge_id)
 );
 CREATE TABLE public.Message (
   message_id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -78,16 +70,6 @@ CREATE TABLE public.QueueEntry (
   CONSTRAINT QueueEntry_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.Patient(patient_id),
   CONSTRAINT QueueEntry_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES public.Doctor(doctor_id),
   CONSTRAINT QueueEntry_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.Service(service_id)
-);
-CREATE TABLE public.Schedule (
-  schedule_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  doctor_id uuid,
-  day_of_week integer NOT NULL,
-  start_time time without time zone NOT NULL,
-  end_time time without time zone NOT NULL,
-  is_available boolean DEFAULT true,
-  CONSTRAINT Schedule_pkey PRIMARY KEY (schedule_id),
-  CONSTRAINT Schedule_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES public.Doctor(doctor_id)
 );
 CREATE TABLE public.Service (
   service_id uuid NOT NULL DEFAULT gen_random_uuid(),

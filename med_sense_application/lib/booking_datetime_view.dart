@@ -50,6 +50,14 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
   List<Map<String, dynamic>> _allDoctors = [];
   bool _isLoading = true;
   
+  // Availability State
+  int _appointmentCountForDate = 0;
+  Set<String> _bookedTimeSlots = {}; // Store booked times
+  bool _checkingAvailability = false;
+  
+  // Realtime
+  RealtimeChannel? _appointmentsChannel;
+
   final List<String> _timeSlots = [
     '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', 
     '11:00 AM', '02:00 PM', '02:30 PM', '03:00 PM', '04:00 PM'
@@ -59,6 +67,85 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
   void initState() {
     super.initState();
     _fetchDoctors();
+    _checkDateAvailability(_selectedDate); // Check availability for initial date
+    _subscribeToAppointments();
+  }
+
+  @override
+  void dispose() {
+    _appointmentsChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToAppointments() {
+    _appointmentsChannel = Supabase.instance.client
+        .channel('public:Appointment:BookingView')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'Appointment',
+          callback: (payload) {
+            // Refresh availability whenever any appointment changes
+            _checkDateAvailability(_selectedDate);
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _checkDateAvailability(DateTime date) async {
+    setState(() => _checkingAvailability = true);
+
+    try {
+      // Create range for the entire day (Local -> UTC)
+      final startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0);
+      final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+      // Fetch appointment_datetime to identify occupied slots
+      // We exclude Cancelled, Completed, and Expired so they don't count towards the daily limit (5)
+      // or block the time slot (though past slots are blocked by time check anyway).
+      final response = await Supabase.instance.client
+          .from('Appointment')
+          .select('appointment_datetime')
+          .gte('appointment_datetime', startOfDay.toUtc().toIso8601String())
+          .lte('appointment_datetime', endOfDay.toUtc().toIso8601String())
+          .neq('status', 'Cancelled')
+          .neq('status', 'Completed')
+          .neq('status', 'Expired');
+
+      final List<dynamic> data = response as List<dynamic>;
+      
+      // Process booked times
+      Set<String> booked = {};
+      for (var item in data) {
+        final String? dtStr = item['appointment_datetime'];
+        if (dtStr != null) {
+          final dt = DateTime.parse(dtStr).toLocal();
+          
+          // Format to "hh:mm AM/PM" to match _timeSlots
+          int hour = dt.hour;
+          final String amPm = hour >= 12 ? 'PM' : 'AM';
+          
+          if (hour > 12) hour -= 12;
+          if (hour == 0) hour = 12;
+
+          final String hourStr = hour.toString().padLeft(2, '0');
+          final String minStr = dt.minute.toString().padLeft(2, '0');
+          
+          booked.add('$hourStr:$minStr $amPm');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _appointmentCountForDate = data.length;
+          _bookedTimeSlots = booked;
+          _checkingAvailability = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking availability: $e');
+      if (mounted) setState(() => _checkingAvailability = false);
+    }
   }
 
   Future<void> _fetchDoctors() async {
@@ -430,11 +517,11 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                       onDateChanged: (date) {
                         setState(() {
                           _selectedDate = date;
+                          _selectedTime = null; // Reset time when date changes
                           // Check if selected time is still valid, else clear it
-                          if (_selectedTime != null && !_isTimeSlotAvailable(_selectedTime!)) {
-                            _selectedTime = null;
-                          }
+                          // (Logic moved to availability check mostly, but ensuring reset is safer)
                         });
+                        _checkDateAvailability(date);
                       },
                     ),
                   ),
@@ -449,7 +536,43 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                   const SizedBox(height: 15),
                   Builder(
                     builder: (context) {
-                      final availableSlots = _timeSlots.where((time) => _isTimeSlotAvailable(time)).toList();
+                      if (_checkingAvailability) {
+                        return const Center(child: CircularProgressIndicator(color: Color(0xFFFBC02D)));
+                      }
+
+                      // Check Limit
+                      if (_appointmentCountForDate >= 5) {
+                         return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.red[200]!),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.event_busy, color: Colors.red, size: 40),
+                              const SizedBox(height: 10),
+                              const Text(
+                                "Date Fully Booked",
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                "This date has reached the maximum number of appointments (5). Please select another date.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12, color: Colors.red[800]),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // Filter out past times AND booked times
+                      final availableSlots = _timeSlots.where((time) => 
+                        _isTimeSlotAvailable(time) && !_bookedTimeSlots.contains(time)
+                      ).toList();
                       
                       if (availableSlots.isEmpty) {
                         return Container(

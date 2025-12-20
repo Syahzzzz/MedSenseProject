@@ -31,7 +31,7 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
     try {
       final response = await _supabase
           .from('Appointment')
-          .select('*, Service(service_name, price), Doctor(name, specialization)')
+          .select('*, Service(service_name, price), Doctor(name, specialization), Patient(name)')
           .eq('patient_id', user.id)
           .order('appointment_datetime', ascending: false);
 
@@ -158,6 +158,7 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
     String status = booking['status'] as String? ?? 'Unknown';
     String paymentStatus = booking['payment_status'] as String? ?? 'Unpaid'; // Default to Unpaid
     String notes = booking['notes'] as String? ?? ''; // Get notes
+    String paymentMethod = booking['payment_method'] as String? ?? '-';
     
     // Price Logic: Use custom_price if available, else service price
     String priceDisplay = 'RM ${service['price'] ?? '0'}';
@@ -286,6 +287,20 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
                    ),
                  ),
               ],
+           ),
+           const SizedBox(height: 4),
+           Row(
+             children: [
+               const Icon(Icons.payment, size: 16, color: Colors.grey),
+               const SizedBox(width: 8),
+               Expanded(
+                 child: Text(
+                   paymentMethod,
+                   style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                   overflow: TextOverflow.ellipsis,
+                 ),
+               ),
+             ],
            ),
            if (notes.isNotEmpty) ...[
              const SizedBox(height: 8),

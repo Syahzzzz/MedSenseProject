@@ -14,6 +14,7 @@ class BookingSuccessView extends StatelessWidget {
     return Scaffold(
       backgroundColor: _yellowColor,
       body: SafeArea(
+        bottom: false, // Extend white background to bottom edge
         child: Column(
           children: [
             // Top Section

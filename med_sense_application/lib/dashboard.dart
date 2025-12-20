@@ -39,6 +39,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   bool _isAppointmentLoading = true;
   Map<String, dynamic>? _upcomingAppointment;
 
+  // Queue Data
+  bool _isQueueLoading = true;
+  Map<String, dynamic>? _queueData;
+
   // Notifications
   int _unreadNotificationsCount = 0;
   RealtimeChannel? _notificationChannel;
@@ -50,7 +54,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     _initializeNotifications();
     _loadUserProfile();
     _fetchTopDoctors();
-    _fetchUpcomingAppointment(); // Added
+    _fetchUpcomingAppointment();
+    _fetchOrGenerateQueueEntry(); // Added Queue Check
     _fetchUnreadNotificationsCount();
     
     _chatAnimationController = AnimationController(
@@ -79,6 +84,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final user = _supabase.auth.currentUser;
     if (user == null) return;
 
+    // Notification Subscription
     _notificationChannel = _supabase.channel('public:Notification:${user.id}')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
@@ -107,6 +113,23 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           },
         )
         .subscribe();
+
+    // Queue Subscription (Listen for status updates)
+    _supabase.channel('public:QueueEntry:${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'QueueEntry',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'patient_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+             _fetchOrGenerateQueueEntry();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _fetchUnreadNotificationsCount() async {
@@ -127,6 +150,103 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       }
     } catch (e) {
       debugPrint('Error fetching notification count: $e');
+    }
+  }
+
+  // --- Queue Logic ---
+  Future<void> _fetchOrGenerateQueueEntry() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isQueueLoading = false);
+      return;
+    }
+
+    try {
+      final now = DateTime.now();
+      // Start of today (UTC for Supabase comparison if needed, but here we construct generic ISO)
+      // We rely on Supabase to handle timestamp comparison correctly if we pass ISO string
+      final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+      final tomorrowStart = DateTime(now.year, now.month, now.day + 1).toUtc().toIso8601String();
+      
+      // 1. Check existing active queue for today
+      final existingQueue = await _supabase
+          .from('QueueEntry')
+          .select()
+          .eq('patient_id', user.id)
+          .gte('check_in_time', todayStart)
+          .lt('check_in_time', tomorrowStart)
+          .neq('status', 'Completed')
+          .neq('status', 'Missed')
+          .limit(1)
+          .maybeSingle();
+
+      if (existingQueue != null) {
+        if (mounted) {
+          setState(() {
+            _queueData = existingQueue;
+            _isQueueLoading = false;
+          });
+        }
+        return;
+      }
+
+      // 2. If no queue, check for eligible appointment (< 12 hours)
+      final limitTime = now.add(const Duration(hours: 12)).toUtc().toIso8601String();
+      final nowUtcStr = now.toUtc().toIso8601String();
+
+      final eligibleAppointment = await _supabase
+          .from('Appointment')
+          .select()
+          .eq('patient_id', user.id)
+          .eq('status', 'Confirmed')
+          .gte('appointment_datetime', nowUtcStr)
+          .lte('appointment_datetime', limitTime)
+          .order('appointment_datetime', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      if (eligibleAppointment != null) {
+        // GENERATE NEW QUEUE NUMBER
+        // Fetch max queue number for today to increment
+        final maxQueueRes = await _supabase
+            .from('QueueEntry')
+            .select('queue_number')
+            .gte('check_in_time', todayStart)
+            .lt('check_in_time', tomorrowStart)
+            .order('queue_number', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        int nextNum = 1;
+        if (maxQueueRes != null) {
+          nextNum = (maxQueueRes['queue_number'] as int) + 1;
+        }
+
+        final newQueue = await _supabase
+            .from('QueueEntry')
+            .insert({
+              'patient_id': user.id,
+              'doctor_id': eligibleAppointment['doctor_id'],
+              'service_id': eligibleAppointment['service_id'],
+              'queue_number': nextNum,
+              'status': 'Waiting',
+            })
+            .select()
+            .single();
+
+        if (mounted) {
+          setState(() {
+            _queueData = newQueue;
+            _isQueueLoading = false;
+          });
+        }
+      } else {
+         if (mounted) setState(() => _isQueueLoading = false);
+      }
+
+    } catch (e) {
+      debugPrint("Queue Error: $e");
+      if (mounted) setState(() => _isQueueLoading = false);
     }
   }
 
@@ -357,6 +477,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     await Future.wait([
       _fetchTopDoctors(),
       _fetchUpcomingAppointment(),
+      _fetchOrGenerateQueueEntry(),
       _fetchUnreadNotificationsCount(),
     ]);
   }
@@ -377,6 +498,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               
               _buildGreeting(),
               const SizedBox(height: 15),
+
+              _buildQueueBanner(),
+              if (_queueData != null) const SizedBox(height: 20),
               
               _buildAppointmentBanner(),
               const SizedBox(height: 30),
@@ -469,6 +593,108 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             child: Text(AppTranslations.get('logout'), style: const TextStyle(color: Colors.redAccent)),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQueueBanner() {
+    if (_isQueueLoading || _queueData == null) return const SizedBox.shrink();
+
+    final queueNum = _queueData!['queue_number'];
+    final status = _queueData!['status'];
+    final checkInTimeStr = _queueData!['check_in_time'] as String;
+    final checkInTime = DateTime.parse(checkInTimeStr).toLocal();
+    final timeFormatted = "${checkInTime.hour}:${checkInTime.minute.toString().padLeft(2, '0')}";
+
+    Color statusColor = Colors.blue;
+    String statusText = "Waiting";
+    
+    if (status == 'Serving') {
+      statusColor = Colors.green;
+      statusText = "Now Serving";
+    }
+
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Center(child: Text("Your Queue Ticket")),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "$queueNum",
+                  style: TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: statusColor),
+                ),
+                Text(
+                  statusText,
+                  style: TextStyle(fontSize: 20, color: statusColor, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Check-in Time:"),
+                      Text(timeFormatted, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close"),
+              )
+            ],
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        decoration: BoxDecoration(
+          color: statusColor,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+             BoxShadow(
+              color: statusColor.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Queue Number", style: TextStyle(color: Colors.white, fontSize: 12)),
+                Text(
+                  "$queueNum", 
+                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                statusText,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
