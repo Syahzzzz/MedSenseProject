@@ -29,6 +29,14 @@ class _StaffDashboardState extends State<StaffDashboard> {
   final _supabase = Supabase.instance.client;
   late String _displayName;
   late String _displayRole;
+  
+  // Notification Counts
+  int _pendingAppointmentsCount = 0;
+  int _patientRequestsCount = 0;
+  int _unreadMessagesCount = 0;
+  int _activeQueueCount = 0;
+
+  RealtimeChannel? _dashboardChannel;
 
   @override
   void initState() {
@@ -38,6 +46,87 @@ class _StaffDashboardState extends State<StaffDashboard> {
                    "Staff";
     
     _displayRole = widget.staffRole ?? "Staff Member";
+    _fetchDashboardCounts();
+    _subscribeToChanges();
+  }
+
+  @override
+  void dispose() {
+    _dashboardChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  Future<void> _fetchDashboardCounts() async {
+    try {
+      // 1. Pending Appointments (Status: Confirmed or Pending - depending on what needs attention, usually newly created ones or ones needing action)
+      // Let's assume 'Confirmed' ones are upcoming and 'Pending' need confirmation.
+      // Adjust logic based on your workflow. Here counting 'Pending' + 'Confirmed' for general activity or just 'Pending' for attention.
+      // Let's count 'Pending' status as "New Appointments" requiring action.
+      final appointmentsRes = await _supabase
+          .from('Appointment')
+          .count(CountOption.exact)
+          .eq('status', 'Pending');
+      
+      // 2. Patient Requests (Cancellation/Reschedule Requested)
+      final requestsRes = await _supabase
+          .from('Appointment')
+          .count(CountOption.exact)
+          .or('status.eq.Cancellation Requested,status.eq.Reschedule Requested');
+
+      // 3. Unread Messages (Incoming from Patients)
+      // Wrapped in try-catch in case 'is_read' column is missing or schema differs
+      int messagesRes = 0;
+      try {
+        messagesRes = await _supabase
+            .from('Message')
+            .count(CountOption.exact)
+            .eq('is_read', false); 
+      } catch (e) {
+        debugPrint("Message count failed (possibly missing is_read column): $e");
+      }
+
+      // 4. Active Queue (Waiting or Serving)
+      final queueRes = await _supabase
+          .from('QueueEntry')
+          .count(CountOption.exact)
+          .or('status.eq.Waiting,status.eq.Serving');
+
+      debugPrint("Dashboard Counts - Appointments: $appointmentsRes, Requests: $requestsRes, Messages: $messagesRes, Queue: $queueRes");
+
+      if (mounted) {
+        setState(() {
+          _pendingAppointmentsCount = appointmentsRes;
+          _patientRequestsCount = requestsRes;
+          _unreadMessagesCount = messagesRes;
+          _activeQueueCount = queueRes;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching dashboard counts: $e');
+    }
+  }
+
+  void _subscribeToChanges() {
+    _dashboardChannel = _supabase.channel('public:staff_dashboard')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'Appointment',
+        callback: (payload) => _fetchDashboardCounts(),
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'Message',
+        callback: (payload) => _fetchDashboardCounts(),
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'QueueEntry',
+        callback: (payload) => _fetchDashboardCounts(),
+      )
+      .subscribe();
   }
 
   Future<void> _logout() async {
@@ -79,122 +168,135 @@ class _StaffDashboardState extends State<StaffDashboard> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryYellow.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
+      body: RefreshIndicator(
+        onRefresh: _fetchDashboardCounts,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryYellow.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.medical_services, size: 60, color: primaryYellow),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                "Welcome, $_displayName",
+                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Text(
+                  _displayRole.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12, 
+                    color: Colors.grey.shade800, 
+                    fontWeight: FontWeight.bold, 
+                    letterSpacing: 1.2
                   ),
-                ],
-              ),
-              child: const Icon(Icons.medical_services, size: 60, color: primaryYellow),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Welcome, $_displayName",
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Text(
-                _displayRole.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 12, 
-                  color: Colors.grey.shade800, 
-                  fontWeight: FontWeight.bold, 
-                  letterSpacing: 1.2
                 ),
               ),
-            ),
-            const SizedBox(height: 40),
-            
-            // Staff Actions List
-            if (widget.isAdmin == true) ...[
-              _buildStaffAction(Icons.calendar_today, "Appointments Management", "View and manage bookings", () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
-                );
-              }),
-              _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffRequestsView()),
-                );
-              }),
-              _buildStaffAction(Icons.edit_note, "Services Management", "Add, edit, or remove services", () {
-                Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const StaffServicesManagementView())
-                );
-              }),
-              _buildStaffAction(Icons.chat, "Patient Messages", "Chat with patients", () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffMessagesView()),
-                );
-              }),
-              _buildStaffAction(Icons.manage_accounts, "Staff & Doctor Registry", "Manage clinic personnel", () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffManagementView()),
-                );
-              }),
-              _buildStaffAction(Icons.list_alt, "Queue System", "Monitor live queue", () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffQueueView()),
-                );
-              }),
-            ] else ...[
-              _buildStaffAction(Icons.calendar_today, "Appointments", "View bookings", () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
-                );
-              }),
-              _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffRequestsView()),
-                );
-              }),
-              _buildStaffAction(Icons.chat, "Messages", "Chat with patients", () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffMessagesView()),
-                );
-              }),
-              _buildStaffAction(Icons.list_alt, "Queue View", "Monitor live queue", () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const StaffQueueView()),
-                );
-              }),
-            ]
-          ],
+              const SizedBox(height: 40),
+              
+              // Staff Actions List
+              if (widget.isAdmin == true) ...[
+                _buildStaffAction(Icons.calendar_today, "Appointments Management", "View and manage bookings", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _pendingAppointmentsCount),
+                
+                _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffRequestsView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _patientRequestsCount),
+                
+                _buildStaffAction(Icons.edit_note, "Services Management", "Add, edit, or remove services", () {
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => const StaffServicesManagementView())
+                  );
+                }),
+                
+                _buildStaffAction(Icons.chat, "Patient Messages", "Chat with patients", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffMessagesView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _unreadMessagesCount),
+                
+                _buildStaffAction(Icons.manage_accounts, "Staff & Doctor Registry", "Manage clinic personnel", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffManagementView()),
+                  );
+                }),
+                
+                _buildStaffAction(Icons.list_alt, "Queue System", "Monitor live queue", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffQueueView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _activeQueueCount),
+                
+              ] else ...[
+                _buildStaffAction(Icons.calendar_today, "Appointments", "View bookings", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _pendingAppointmentsCount),
+                
+                _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffRequestsView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _patientRequestsCount),
+                
+                _buildStaffAction(Icons.chat, "Messages", "Chat with patients", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffMessagesView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _unreadMessagesCount),
+                
+                _buildStaffAction(Icons.list_alt, "Queue View", "Monitor live queue", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffQueueView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _activeQueueCount),
+              ]
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStaffAction(IconData icon, String title, String subtitle, VoidCallback onTap) {
+  Widget _buildStaffAction(IconData icon, String title, String subtitle, VoidCallback onTap, {int badgeCount = 0}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -219,13 +321,44 @@ class _StaffDashboardState extends State<StaffDashboard> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFBC02D).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(icon, color: const Color(0xFFFBC02D), size: 28),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFBC02D).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(icon, color: const Color(0xFFFBC02D), size: 28),
+                    ),
+                    if (badgeCount > 0)
+                      Positioned(
+                        right: -5,
+                        top: -5,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
+                          child: Center(
+                            child: Text(
+                              badgeCount > 99 ? '99+' : '$badgeCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 20),
                 Expanded(

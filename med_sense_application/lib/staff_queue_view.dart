@@ -37,12 +37,10 @@ class _StaffQueueViewState extends State<StaffQueueView> {
   Future<void> _fetchQueue() async {
     try {
       // Fetch active queues (Waiting or Serving)
-      // We join with Patient to get names.
-      // Note: Supabase syntax for joining might vary based on setup, 
-      // but usually .select('*, Patient(*)') works if FK exists.
+      // We join with Patient to get names, Service to get service details, Appointment to get time, and Doctor for name.
       final response = await _supabase
           .from('QueueEntry')
-          .select('*, Patient(name)')
+          .select('*, Patient(name), Service(service_name), Appointment(appointment_datetime), Doctor(name)')
           .or('status.eq.Waiting,status.eq.Serving') // Only active
           .order('queue_number', ascending: true);
 
@@ -60,13 +58,62 @@ class _StaffQueueViewState extends State<StaffQueueView> {
 
   Future<void> _updateStatus(String queueId, String newStatus) async {
     try {
+      Map<String, dynamic> updates = {'status': newStatus};
+
+      // Room Assignment Logic when Calling
+      if (newStatus == 'Serving') {
+        // ... (existing room logic)
+        final servingRes = await _supabase
+            .from('QueueEntry')
+            .select('assigned_room')
+            .eq('status', 'Serving');
+        
+        final List<dynamic> data = servingRes; 
+        final usedRooms = data
+            .map((e) => e['assigned_room'] as int?)
+            .where((e) => e != null)
+            .toSet();
+
+        int assignedRoom = 101;
+        if (usedRooms.contains(101)) {
+          assignedRoom = 102;
+        } 
+        
+        updates['assigned_room'] = assignedRoom;
+      }
+      
+      // Auto-update Appointment status if Queue is Completed
+      if (newStatus == 'Completed') {
+         // Get appointment_id linked to this queue
+         final queueRecord = await _supabase
+             .from('QueueEntry')
+             .select('appointment_id')
+             .eq('queue_id', queueId)
+             .maybeSingle();
+         
+         if (queueRecord != null && queueRecord['appointment_id'] != null) {
+            final String apptId = queueRecord['appointment_id'];
+            await _supabase
+                .from('Appointment')
+                .update({'status': 'Completed'})
+                .eq('appointment_id', apptId);
+         }
+      }
+
       await _supabase
           .from('QueueEntry')
-          .update({'status': newStatus})
+          .update(updates)
           .eq('queue_id', queueId);
       
       // The subscription will auto-refresh, but we can optimistically update too
       _fetchQueue();
+      
+      if (mounted) {
+         String msg = 'Status updated to $newStatus';
+         if (newStatus == 'Serving') msg = 'Calling Patient to Room ${updates['assigned_room']}';
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,9 +186,38 @@ class _StaffQueueViewState extends State<StaffQueueView> {
 
   Widget _buildQueueCard(Map<String, dynamic> entry, bool isServing) {
     final patient = entry['Patient'] as Map<String, dynamic>?;
+    final service = entry['Service'] as Map<String, dynamic>?;
+    final appointment = entry['Appointment'] as Map<String, dynamic>?;
+    final doctor = entry['Doctor'] as Map<String, dynamic>?;
+
     final patientName = patient?['name'] ?? 'Unknown Patient';
+    final serviceName = service?['service_name'] ?? 'Consultation';
+    final doctorName = doctor != null ? doctor['name'] : 'Any Doctor';
     final queueNum = entry['queue_number'];
     final queueId = entry['queue_id'];
+    final assignedRoom = entry['assigned_room'];
+    
+    // Check-in Time Display (Actual Arrival)
+    final arrivalTimeStr = entry['arrival_time'] as String?;
+    String arrivalDisplay = "Not arrived yet";
+    if (arrivalTimeStr != null) {
+      final dt = DateTime.parse(arrivalTimeStr).toLocal();
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      arrivalDisplay = "Arrived at $hour:${dt.minute.toString().padLeft(2, '0')} $amPm";
+    }
+
+    // Expected Arrival (Appointment Time - 15 mins)
+    String expectedDisplay = "N/A";
+    if (appointment != null) {
+      final apptStr = appointment['appointment_datetime'] as String;
+      final apptDt = DateTime.parse(apptStr).toLocal();
+      // Suggest 15 mins early
+      final expectedDt = apptDt.subtract(const Duration(minutes: 15));
+      final amPm = expectedDt.hour >= 12 ? 'PM' : 'AM';
+      final hour = expectedDt.hour > 12 ? expectedDt.hour - 12 : (expectedDt.hour == 0 ? 12 : expectedDt.hour);
+      expectedDisplay = "$hour:${expectedDt.minute.toString().padLeft(2, '0')} $amPm";
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -187,11 +263,59 @@ class _StaffQueueViewState extends State<StaffQueueView> {
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    isServing ? "Status: Serving" : "Status: Waiting",
+                    "$serviceName • $doctorName",
                     style: TextStyle(
-                      color: isServing ? Colors.green : Colors.grey[600],
-                      fontSize: 13,
+                      fontSize: 14,
+                      color: Colors.grey[800],
+                      fontWeight: FontWeight.w500
                     ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  if (assignedRoom != null)
+                     Padding(
+                       padding: const EdgeInsets.only(bottom: 4.0),
+                       child: Text(
+                         "Assigned Room: $assignedRoom",
+                         style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13),
+                       ),
+                     ),
+                  
+                  // Row 1: Actual Arrival
+                  Row(
+                    children: [
+                      Icon(
+                        arrivalTimeStr != null ? Icons.check_circle : Icons.access_time, 
+                        size: 12, 
+                        color: arrivalTimeStr != null ? Colors.green : Colors.orange
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        arrivalDisplay,
+                        style: TextStyle(
+                          color: arrivalTimeStr != null ? Colors.green[700] : Colors.orange[800],
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 2),
+                  
+                  // Row 2: Expected Arrival
+                  Row(
+                    children: [
+                      const Icon(Icons.event_available, size: 12, color: Colors.blueGrey),
+                      const SizedBox(width: 4),
+                      Text(
+                        "Expected: $expectedDisplay",
+                        style: const TextStyle(
+                          color: Colors.blueGrey,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -206,7 +330,41 @@ class _StaffQueueViewState extends State<StaffQueueView> {
               )
             else
               ElevatedButton(
-                onPressed: () => _updateStatus(queueId, 'Serving'),
+                onPressed: () {
+                  if (entry['arrival_time'] == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Patient not arrived yet"),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Check if Doctor is already serving someone else
+                  final currentDoctorId = entry['doctor_id'];
+                  if (currentDoctorId != null) {
+                    final servingEntry = _queueEntries.firstWhere(
+                      (q) => q['status'] == 'Serving' && q['doctor_id'] == currentDoctorId,
+                      orElse: () => {},
+                    );
+
+                    if (servingEntry.isNotEmpty) {
+                      final servingPatientName = servingEntry['Patient']?['name'] ?? 'another patient';
+                      final servingDoctorName = servingEntry['Doctor']?['name'] ?? 'Doctor';
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                         SnackBar(
+                          content: Text("$servingDoctorName is currently serving $servingPatientName"),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+                  }
+
+                  _updateStatus(queueId, 'Serving');
+                },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                 child: const Text("Call", style: TextStyle(color: Colors.white)),
               ),

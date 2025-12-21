@@ -48,7 +48,7 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
   DateTime _selectedDate = DateTime.now();
   String? _selectedTime;
   List<Map<String, dynamic>> _allDoctors = [];
-  bool _isLoading = true;
+  Map<String, dynamic>? _assignedDoctor;
   
   // Availability State
   int _appointmentCountForDate = 0;
@@ -60,14 +60,14 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
 
   final List<String> _timeSlots = [
     '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', 
-    '11:00 AM', '02:00 PM', '02:30 PM', '03:00 PM', '04:00 PM'
+    '11:00 AM', '02:00 PM', '02:30 PM', '03:00 PM', '04:00 PM',
+    '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM'
   ];
 
   @override
   void initState() {
     super.initState();
-    _fetchDoctors();
-    _checkDateAvailability(_selectedDate); // Check availability for initial date
+    _fetchDoctors(); // This will trigger availability check once doctor is assigned
     _subscribeToAppointments();
   }
 
@@ -93,6 +93,9 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
   }
 
   Future<void> _checkDateAvailability(DateTime date) async {
+    // If no doctor is assigned yet, we can't check specific availability
+    if (_assignedDoctor == null) return;
+
     setState(() => _checkingAvailability = true);
 
     try {
@@ -100,17 +103,18 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
       final startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0);
       final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
-      // Fetch appointment_datetime to identify occupied slots
-      // We exclude Cancelled, Completed, and Expired so they don't count towards the daily limit (5)
-      // or block the time slot (though past slots are blocked by time check anyway).
-      final response = await Supabase.instance.client
+      // Fetch appointment_datetime to identify occupied slots for THIS doctor
+      final query = Supabase.instance.client
           .from('Appointment')
           .select('appointment_datetime')
+          .eq('doctor_id', _assignedDoctor!['doctor_id']) // Filter by Doctor ID
           .gte('appointment_datetime', startOfDay.toUtc().toIso8601String())
           .lte('appointment_datetime', endOfDay.toUtc().toIso8601String())
           .neq('status', 'Cancelled')
           .neq('status', 'Completed')
           .neq('status', 'Expired');
+
+      final response = await query;
 
       final List<dynamic> data = response as List<dynamic>;
       
@@ -152,40 +156,31 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
     try {
       final response = await Supabase.instance.client
           .from('Doctor')
-          .select('name, specialization');
+          .select('doctor_id, name, specialization'); // Added doctor_id
       
       if (mounted) {
         setState(() {
           _allDoctors = List<Map<String, dynamic>>.from(response);
-          _isLoading = false;
+          _selectDoctor(); // Select doctor immediately after fetching
         });
+        
+        // Check availability now that we have a doctor
+        _checkDateAvailability(_selectedDate);
       }
     } catch (e) {
       debugPrint('Error fetching doctors: $e');
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Helper to determine the service category key
-  String _getServiceKey() {
-    if (widget.serviceName.contains('Braces') || widget.serviceName.contains('Metal') || widget.serviceName.contains('Ceramic')) {
-      return 'Braces';
-    } else if (widget.serviceName.contains('Whitening')) {
-      return 'Whitening';
-    } else if (widget.serviceName.contains('Retainer')) {
-      return 'Retainers';
+  // Select the correct doctor based on Service and store in state
+  void _selectDoctor() {
+    if (_allDoctors.isEmpty) {
+      _assignedDoctor = {'name': 'Dr. Available', 'specialization': 'General Dentist', 'doctor_id': null};
+      return;
     }
-    return 'Scaling'; // Default
-  }
-
-  // Get the correct doctor based on Service (matching specialization)
-  Map<String, String> _getDoctorInfo() {
-    if (_isLoading) return {'name': 'Loading...', 'role': '...'};
-    if (_allDoctors.isEmpty) return {'name': 'Dr. Available', 'role': 'General Dentist'};
 
     final String serviceKey = _getServiceKey();
     
-    // Find best match
     try {
       final match = _allDoctors.firstWhere((doc) {
         final String spec = (doc['specialization'] as String? ?? '').toLowerCase();
@@ -199,13 +194,22 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
         return false;
       }, orElse: () => _allDoctors.first);
       
-      return {
-        'name': match['name'] as String? ?? 'Dr. Available',
-        'role': match['specialization'] as String? ?? 'Dentist',
-      };
+      _assignedDoctor = match;
     } catch (e) {
-      return {'name': 'Dr. Available', 'role': 'General Dentist'};
+      _assignedDoctor = _allDoctors.first;
     }
+  }
+
+  // Helper to determine the service category key
+  String _getServiceKey() {
+    if (widget.serviceName.contains('Braces') || widget.serviceName.contains('Metal') || widget.serviceName.contains('Ceramic')) {
+      return 'Braces';
+    } else if (widget.serviceName.contains('Whitening')) {
+      return 'Whitening';
+    } else if (widget.serviceName.contains('Retainer')) {
+      return 'Retainers';
+    }
+    return 'Scaling'; // Default
   }
 
   void _handleBack() {
@@ -368,7 +372,7 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
 
   @override
   Widget build(BuildContext context) {
-    final doctor = _getDoctorInfo(); // This now updates when _selectedClinicIndex changes
+    final doctor = _assignedDoctor ?? {'name': 'Loading...', 'specialization': 'Loading...'};
     final Color primaryYellow = const Color(0xFFFBC02D);
     final selectedClinic = _clinics[_selectedClinicIndex];
 
@@ -432,7 +436,7 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                doctor['role']!,
+                                doctor['specialization'] ?? 'Dentist',
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: 13,
@@ -667,7 +671,8 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                               description: widget.description, // Pass description
                               date: _selectedDate,
                               time: _selectedTime!,
-                              doctorName: doctor['name']!, 
+                              doctorName: doctor['name']!,
+                              doctorId: doctor['doctor_id'],
                             ),
                           ),
                         );

@@ -63,13 +63,17 @@ CREATE TABLE public.QueueEntry (
   patient_id uuid,
   doctor_id uuid,
   service_id uuid,
+  appointment_id uuid,
   check_in_time timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  arrival_time timestamp with time zone,
+  assigned_room integer,
   queue_number integer NOT NULL,
   status character varying NOT NULL,
   CONSTRAINT QueueEntry_pkey PRIMARY KEY (queue_id),
   CONSTRAINT QueueEntry_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.Patient(patient_id),
   CONSTRAINT QueueEntry_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES public.Doctor(doctor_id),
-  CONSTRAINT QueueEntry_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.Service(service_id)
+  CONSTRAINT QueueEntry_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.Service(service_id),
+  CONSTRAINT QueueEntry_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.Appointment(appointment_id)
 );
 CREATE TABLE public.Service (
   service_id uuid NOT NULL DEFAULT gen_random_uuid(),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'booking_success_view.dart';
+import 'translations.dart';
 
 class OnlineBankingView extends StatefulWidget {
   final String clinicNameKey;
@@ -8,6 +10,7 @@ class OnlineBankingView extends StatefulWidget {
   final String doctorName;
   final DateTime date;
   final String time;
+  final String price;
 
   const OnlineBankingView({
     super.key,
@@ -16,6 +19,7 @@ class OnlineBankingView extends StatefulWidget {
     required this.doctorName,
     required this.date,
     required this.time,
+    required this.price,
   });
 
   @override
@@ -89,9 +93,10 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
 
       // 3. Parse DateTime
       final DateTime fullDateTime = _parseDateTime(widget.date, widget.time);
+      final String displayDate = "${widget.date.day}/${widget.date.month}/${widget.date.year}";
 
       // 4. Insert Appointment
-      await _supabase.from('Appointment').insert({
+      final newAppointment = await _supabase.from('Appointment').insert({
         'patient_id': user.id,
         'doctor_id': doctorId,
         'service_id': serviceId,
@@ -100,15 +105,31 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
         'payment_status': 'Paid',
         'payment_method': 'Online Banking ($bankName)',
         'predicted_wait_time_minutes': 0, 
-      });
+      }).select().single();
+
+      // Set notification flag for Dashboard
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_new_booking', true);
 
       if (!mounted) return;
 
       // Navigate to Success
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const BookingSuccessView()),
-        (route) => route.isFirst, 
+        MaterialPageRoute(
+          builder: (context) => BookingSuccessView(
+            appointmentDetails: {
+              'appointment_id': newAppointment['appointment_id'],
+              'service_name': widget.serviceName,
+              'doctor_name': widget.doctorName,
+              'clinic_name': AppTranslations.get(widget.clinicNameKey),
+              'date': displayDate,
+              'time': widget.time,
+              'price': widget.price,
+            },
+          )
+        ),
+        (route) => false, 
       );
 
     } catch (e) {

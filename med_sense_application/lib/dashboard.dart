@@ -45,6 +45,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   // Notifications
   int _unreadNotificationsCount = 0;
+  bool _hasNewBooking = false; // Add this state variable
   RealtimeChannel? _notificationChannel;
 
   // --- Lifecycle ---
@@ -57,6 +58,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     _fetchUpcomingAppointment();
     _fetchOrGenerateQueueEntry(); // Added Queue Check
     _fetchUnreadNotificationsCount();
+    _checkBookingNotification(); // Check for new booking
     
     _chatAnimationController = AnimationController(
       vsync: this,
@@ -153,6 +155,15 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     }
   }
 
+  Future<void> _checkBookingNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _hasNewBooking = prefs.getBool('has_new_booking') ?? false;
+      });
+    }
+  }
+
   // --- Queue Logic ---
   Future<void> _fetchOrGenerateQueueEntry() async {
     final user = _supabase.auth.currentUser;
@@ -171,12 +182,13 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       // 1. Check existing active queue for today
       final existingQueue = await _supabase
           .from('QueueEntry')
-          .select()
+          .select('*, Doctor(name)')
           .eq('patient_id', user.id)
           .gte('check_in_time', todayStart)
           .lt('check_in_time', tomorrowStart)
           .neq('status', 'Completed')
           .neq('status', 'Missed')
+          .neq('status', 'Cancelled')
           .limit(1)
           .maybeSingle();
 
@@ -228,10 +240,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               'patient_id': user.id,
               'doctor_id': eligibleAppointment['doctor_id'],
               'service_id': eligibleAppointment['service_id'],
+              'appointment_id': eligibleAppointment['appointment_id'],
               'queue_number': nextNum,
               'status': 'Waiting',
             })
-            .select()
+            .select('*, Doctor(name)')
             .single();
 
         if (mounted) {
@@ -479,6 +492,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       _fetchUpcomingAppointment(),
       _fetchOrGenerateQueueEntry(),
       _fetchUnreadNotificationsCount(),
+      _checkBookingNotification(),
     ]);
   }
 
@@ -551,9 +565,32 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   ),
               ],
             ),
-            IconButton(
-              icon: const Icon(Icons.history, color: Colors.black54),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingHistoryView())),
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.history, color: Colors.black54),
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingHistoryView()));
+                    _checkBookingNotification(); // Refresh on return
+                  },
+                ),
+                if (_hasNewBooking)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 8,
+                        minHeight: 8,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 10),
             GestureDetector(
@@ -597,104 +634,262 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     );
   }
 
+  Future<void> _confirmArrival() async {
+    if (_queueData == null) return;
+    
+    // Confirmation Dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Check-in"),
+          content: const Text(
+            "Please ensure you have arrived at the clinic before checking in.\n\n"
+            "If you are not present when called, your appointment may be cancelled by the staff."
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFBC02D)),
+              child: const Text("I am here", style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    final queueId = _queueData!['queue_id'];
+
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final updated = await _supabase
+          .from('QueueEntry')
+          .update({'arrival_time': now})
+          .eq('queue_id', queueId)
+          .select()
+          .single();
+
+      if (mounted) {
+        setState(() {
+          _queueData = updated;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("You have successfully checked in!")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error confirming arrival: $e");
+      // Fallback/Demo if column missing
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Check-in failed (DB Error): $e")),
+        );
+      }
+    }
+  }
+
   Widget _buildQueueBanner() {
     if (_isQueueLoading || _queueData == null) return const SizedBox.shrink();
 
     final queueNum = _queueData!['queue_number'];
     final status = _queueData!['status'];
-    final checkInTimeStr = _queueData!['check_in_time'] as String;
-    final checkInTime = DateTime.parse(checkInTimeStr).toLocal();
-    final timeFormatted = "${checkInTime.hour}:${checkInTime.minute.toString().padLeft(2, '0')}";
+    // arrival_time tracks the user's manual check-in
+    final arrivalTimeStr = _queueData!['arrival_time'] as String?;
+    
+    // Doctor Name
+    final doctor = _queueData!['Doctor'] as Map<String, dynamic>?;
+    final doctorName = doctor != null ? doctor['name'] : 'Available Doctor';
+    final doctorDisplay = doctorName.toString().startsWith("Dr.") ? doctorName : "Dr. $doctorName";
 
-    Color statusColor = Colors.blue;
+    // Room Number
+    final roomNum = _queueData!['assigned_room'];
+    String roomText = roomNum != null ? "Room $roomNum" : "Room: TBD";
+
+    // Prediction Logic based on Appointment Time
+    String predictionLabel = "Est. Arrival";
+    String predictionTime = "--:--";
+    
+    if (_upcomingAppointment != null) {
+       final dtStr = _upcomingAppointment!['appointment_datetime'] as String;
+       final dt = DateTime.parse(dtStr).toLocal();
+       // "Smart" Prediction: Suggest arriving 15 mins early
+       final arrivalTime = dt.subtract(const Duration(minutes: 15));
+       final amPm = arrivalTime.hour >= 12 ? 'PM' : 'AM';
+       final hour = arrivalTime.hour > 12 ? arrivalTime.hour - 12 : (arrivalTime.hour == 0 ? 12 : arrivalTime.hour);
+       predictionTime = "$hour:${arrivalTime.minute.toString().padLeft(2, '0')} $amPm";
+    } else {
+       // If no appointment logic but queue exists (e.g. walk-in), just show current time or "Now"
+       predictionTime = "Now";
+    }
+
+    Color statusColor = const Color(0xFF2196F3); // Blue
     String statusText = "Waiting";
     
     if (status == 'Serving') {
-      statusColor = Colors.green;
-      statusText = "Now Serving";
+      statusColor = const Color(0xFF4CAF50); // Green
+      if (roomNum != null) {
+        statusText = "Proceed to Room $roomNum";
+      } else {
+        statusText = "Proceed to Room"; 
+      }
     }
 
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Center(child: Text("Your Queue Ticket")),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "$queueNum",
-                  style: TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: statusColor),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: statusColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+           BoxShadow(
+            color: statusColor.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Top Row: Doctor & Room info
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.person, color: Colors.white70, size: 16),
+                  const SizedBox(width: 5),
+                  Text(doctorDisplay, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(5)
                 ),
-                Text(
+                child: Text(roomText, style: const TextStyle(color: Colors.white, fontSize: 12)),
+              )
+            ],
+          ),
+          const SizedBox(height: 15),
+          
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Queue Number", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(
+                    "$queueNum", 
+                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
                   statusText,
-                  style: TextStyle(fontSize: 20, color: statusColor, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 20),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              )
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Row(
+              children: [
+                // Section 1: Check In Status or Button
+                Expanded(
+                  child: arrivalTimeStr != null 
+                    ? _buildCheckedInState(arrivalTimeStr)
+                    : _buildCheckInButton(statusColor),
+                ),
+                
+                // Vertical Divider
+                Container(
+                  width: 1, 
+                  height: 40, 
+                  color: Colors.white24, 
+                  margin: const EdgeInsets.symmetric(horizontal: 10)
+                ),
+                
+                // Section 2: Smart Estimation
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Check-in Time:"),
-                      Text(timeFormatted, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(predictionLabel, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time_filled, color: Colors.white, size: 14),
+                          const SizedBox(width: 5),
+                          Text(predictionTime, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        ],
+                      )
                     ],
                   ),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Close"),
-              )
-            ],
-          ),
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        decoration: BoxDecoration(
-          color: statusColor,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-             BoxShadow(
-              color: statusColor.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckedInState(String arrivalTimeStr) {
+    final dt = DateTime.parse(arrivalTimeStr).toLocal();
+    final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final timeStr = "$hour:${dt.minute.toString().padLeft(2, '0')} $amPm";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Checked In", style: TextStyle(color: Colors.white70, fontSize: 10)),
+        const SizedBox(height: 4),
+        Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Queue Number", style: TextStyle(color: Colors.white, fontSize: 12)),
-                Text(
-                  "$queueNum", 
-                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)
-                ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                statusText,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            )
+            const Icon(Icons.check_circle, color: Colors.white, size: 14),
+            const SizedBox(width: 5),
+            Text(timeStr, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
           ],
+        )
+      ],
+    );
+  }
+
+  Widget _buildCheckInButton(Color primaryColor) {
+    return SizedBox(
+      height: 40,
+      child: ElevatedButton.icon(
+        onPressed: _confirmArrival,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: primaryColor,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
+        icon: const Icon(Icons.touch_app, size: 18),
+        label: const Text("Check In Now", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -781,6 +976,21 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       imageAsset = 'images/sarah.png';
     }
 
+    // Dynamic Badge Logic
+    String badgeText = AppTranslations.get('upcoming');
+    Color badgeColor = const Color(0xFFFFA000);
+
+    if (_queueData != null && 
+        _queueData!['appointment_id'] == apt['appointment_id']) {
+         if (_queueData!['assigned_room'] != null) {
+            badgeText = "Room ${_queueData!['assigned_room']}";
+            badgeColor = Colors.green;
+         } else if (_queueData!['status'] == 'Serving') {
+            badgeText = "Now Serving";
+            badgeColor = Colors.green;
+         }
+    }
+
     return Container(
       padding: const EdgeInsets.all(20), 
       decoration: BoxDecoration(
@@ -822,11 +1032,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), 
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFA000), 
+                  color: badgeColor, 
                   borderRadius: BorderRadius.circular(10)
                 ), 
                 child: Text(
-                  AppTranslations.get('upcoming'), 
+                  badgeText, 
                   style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)
                 )
               ),

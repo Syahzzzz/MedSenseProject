@@ -162,17 +162,28 @@ class _PinLoginViewState extends State<PinLoginView> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                TextButton(
-                                  onPressed: _handleLogout,
-                                  child: const Text(
-                                    "Forgot?", 
-                                    style: TextStyle(color: Colors.grey, fontSize: 14)
+                                SizedBox(
+                                  width: 70,
+                                  height: 70,
+                                  child: Center(
+                                    child: TextButton(
+                                      onPressed: _handleLogout,
+                                      child: const Text(
+                                        "Forgot?", 
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(color: Colors.grey, fontSize: 12) // Slightly smaller text to fit
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 _buildDigitButton('0'),
-                                IconButton(
-                                  onPressed: _onDeletePress,
-                                  icon: const Icon(Icons.backspace_outlined, size: 28, color: Colors.black54),
+                                SizedBox(
+                                  width: 70,
+                                  height: 70,
+                                  child: IconButton(
+                                    onPressed: _onDeletePress,
+                                    icon: const Icon(Icons.backspace_outlined, size: 28, color: Colors.black54),
+                                  ),
                                 ),
                               ],
                             ),

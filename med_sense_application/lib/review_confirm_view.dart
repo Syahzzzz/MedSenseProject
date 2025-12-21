@@ -14,6 +14,7 @@ class ReviewConfirmView extends StatefulWidget {
   final DateTime date;
   final String time;
   final String doctorName; 
+  final dynamic doctorId; // Added doctorId
 
   const ReviewConfirmView({
     super.key,
@@ -25,6 +26,7 @@ class ReviewConfirmView extends StatefulWidget {
     required this.date,
     required this.time,
     required this.doctorName, 
+    required this.doctorId,
   });
 
   @override
@@ -81,6 +83,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
              doctorName: widget.doctorName,
              date: widget.date,
              time: widget.time,
+             price: widget.servicePrice,
            )
          )
        );
@@ -107,15 +110,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
       if (serviceRes == null) throw "Service not found: ${widget.serviceName}";
       final serviceId = serviceRes['service_id'];
 
-      // 2. Get Doctor ID
-      final doctorRes = await _supabase
-          .from('Doctor')
-          .select('doctor_id')
-          .eq('name', widget.doctorName)
-          .maybeSingle();
-
-      if (doctorRes == null) throw "Doctor not found: ${widget.doctorName}";
-      final doctorId = doctorRes['doctor_id'];
+      // 2. Doctor ID is now passed in via widget.doctorId
 
       // 3. Combine Date & Time
       final DateTime fullDateTime = _parseDateTime(widget.date, widget.time);
@@ -127,23 +122,39 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
       }
 
       // 4. Insert Appointment
-      await _supabase.from('Appointment').insert({
+      final newAppointment = await _supabase.from('Appointment').insert({
         'patient_id': user.id,
-        'doctor_id': doctorId,
+        'doctor_id': widget.doctorId, // Use passed ID
         'service_id': serviceId,
         'appointment_datetime': fullDateTime.toUtc().toIso8601String(),
         'status': 'Pending', 
         'payment_status': paymentStatus,
         'payment_method': _paymentMethod,
         'predicted_wait_time_minutes': 0, 
-      });
+      }).select().single();
+
+      // Set notification flag for Dashboard
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_new_booking', true);
 
       if (!mounted) return;
 
-      // Navigate to Success View instead of generic Snackbar/Home
+      // Navigate to Success View with details
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const BookingSuccessView()),
+        MaterialPageRoute(
+          builder: (context) => BookingSuccessView(
+            appointmentDetails: {
+              'appointment_id': newAppointment['appointment_id'],
+              'service_name': widget.serviceName,
+              'doctor_name': widget.doctorName,
+              'clinic_name': AppTranslations.get(widget.clinicNameKey),
+              'date': "${widget.date.day}/${widget.date.month}/${widget.date.year}",
+              'time': widget.time,
+              'price': widget.servicePrice,
+            },
+          )
+        ),
       );
 
     } catch (e) {

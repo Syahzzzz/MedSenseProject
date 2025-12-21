@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'reschedule_view.dart';
 
 class AppointmentReceiptView extends StatefulWidget {
   final Map<String, dynamic> appointment;
@@ -156,66 +157,37 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
     final String currentStatus = widget.appointment['status'] ?? 'Pending';
     final bool isPending = currentStatus.toLowerCase() == 'pending';
 
-    // 1. Pick Date
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFBC02D),
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
+    // 1. Navigate to RescheduleView to pick new time
+    final DateTime? newDateTime = await Navigator.push<DateTime>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RescheduleView(appointment: widget.appointment),
+      ),
     );
 
-    if (pickedDate == null) return;
+    if (newDateTime == null) return;
 
-    // 2. Pick Time
+    // 2. Confirm
     if (!mounted) return;
-    final TimeOfDay? pickedTime = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
-      builder: (context, child) {
-         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFBC02D),
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      }
-    );
-
-    if (pickedTime == null) return;
-
-    // 3. Confirm
-    if (!mounted) return;
-    final newDateTime = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute);
     
-    // Check if within business hours (9AM - 5PM approx)
-    if (pickedTime.hour < 9 || pickedTime.hour > 17) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a time between 9:00 AM and 5:00 PM")));
-      return;
-    }
-
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(isPending ? "Confirm Reschedule" : "Confirm Reschedule Request"),
-        content: Text(isPending 
-          ? "Reschedule appointment to:\n\n${newDateTime.toString().split('.')[0]}?"
-          : "Request to move appointment to:\n\n${newDateTime.toString().split('.')[0]}\n\nThis will be sent to staff for approval."
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isPending 
+              ? "Reschedule appointment to:\n\n${newDateTime.toString().split('.')[0]}?"
+              : "Request to move appointment to:\n\n${newDateTime.toString().split('.')[0]}\n\nThis will be sent to staff for approval."
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              "Note: Rescheduling only have 1 attempt for every booking.",
+              style: TextStyle(color: Colors.red, fontSize: 12, fontStyle: FontStyle.italic),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
@@ -233,20 +205,21 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
       try {
         final id = widget.appointment['appointment_id'];
         
+        // Prepare note to track attempt
+        final currentNotes = widget.appointment['notes'] ?? '';
+        final newNote = "$currentNotes\n[Reschedule Request: ${newDateTime.toUtc().toIso8601String()}]".trim();
+
         if (isPending) {
            // Immediate Update
            await Supabase.instance.client
             .from('Appointment')
             .update({
               'appointment_datetime': newDateTime.toUtc().toIso8601String(),
-              // Keep status as Pending
+              'notes': newNote, // Add note to track attempt
             })
             .eq('appointment_id', id);
         } else {
            // Request Mode
-           final currentNotes = widget.appointment['notes'] ?? '';
-           final newNote = "$currentNotes\n[Reschedule Request: ${newDateTime.toIso8601String()}]".trim();
-
            await Supabase.instance.client
             .from('Appointment')
             .update({
@@ -255,6 +228,9 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
             })
             .eq('appointment_id', id);
         }
+
+        // Cancel any existing Queue Entry for this appointment to prevent stale dashboard state
+        await _cancelLinkedQueueEntry(id);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -272,6 +248,18 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
       } finally {
         if (mounted) setState(() => _isProcessing = false);
       }
+    }
+  }
+
+  Future<void> _cancelLinkedQueueEntry(dynamic appointmentId) async {
+    try {
+      await Supabase.instance.client
+          .from('QueueEntry')
+          .update({'status': 'Cancelled'})
+          .eq('appointment_id', appointmentId)
+          .neq('status', 'Completed');
+    } catch (e) {
+      debugPrint("Error cancelling queue: $e");
     }
   }
 
@@ -299,6 +287,9 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
     final String status = apt['status'] ?? 'Pending';
     String paymentStatus = apt['payment_status'] ?? 'Unpaid';
     final String notes = apt['notes'] ?? '';
+
+    // Check if rescheduled before
+    final bool hasRescheduled = notes.contains('[Reschedule Request:');
 
     // Logic for Payment Status Display on Cancellation
     if (status.toLowerCase() == 'cancelled') {
@@ -509,9 +500,19 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _isProcessing ? null : _handleRescheduling,
+                        onPressed: _isProcessing 
+                          ? null 
+                          : () {
+                              if (hasRescheduled) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("No more attempt left"))
+                                );
+                              } else {
+                                _handleRescheduling();
+                              }
+                            },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFBC02D),
+                          backgroundColor: hasRescheduled ? Colors.grey : const Color(0xFFFBC02D),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),

@@ -58,6 +58,13 @@ class _StaffRequestsViewState extends State<StaffRequestsView> {
              updates['payment_status'] = 'Refunded';
            }
            notificationMessage = "Your cancellation request has been approved. Status is now Cancelled.";
+           
+           // Also cancel the queue entry if it exists
+           await _supabase
+               .from('QueueEntry')
+               .update({'status': 'Cancelled'})
+               .eq('appointment_id', id);
+
         } else {
            // Reject Cancellation -> Revert to Confirmed
            updates['status'] = 'Confirmed'; 
@@ -70,7 +77,10 @@ class _StaffRequestsViewState extends State<StaffRequestsView> {
           final regExp = RegExp(r'\[Reschedule Request: (.*?)\]');
           final match = regExp.firstMatch(newDateStr);
           if (match != null) {
-             updates['appointment_datetime'] = match.group(1);
+             // Parse the string and ensure it is converted to UTC string for DB
+             // This handles both old local-string requests and new UTC-string requests correctly
+             updates['appointment_datetime'] = DateTime.parse(match.group(1)!).toUtc().toIso8601String();
+             
              // Format date for notification
              try {
                final dt = DateTime.parse(match.group(1)!).toLocal();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'translations.dart';
 import 'appointment_receipt_view.dart';
 
@@ -18,7 +19,13 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
   @override
   void initState() {
     super.initState();
+    _clearNewBookingFlag();
     _fetchBookings();
+  }
+
+  Future<void> _clearNewBookingFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_new_booking', false);
   }
 
   Future<void> _fetchBookings() async {
@@ -223,16 +230,22 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
             Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatDate(booking['appointment_datetime']),
-                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
-                  ),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _formatDate(booking['appointment_datetime']),
+                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
