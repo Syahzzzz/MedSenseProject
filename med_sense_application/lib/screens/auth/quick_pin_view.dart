@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'translations.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class QuickPinView extends StatefulWidget {
   const QuickPinView({super.key});

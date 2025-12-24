@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Added import
-import 'dashboard.dart';
-import 'translations.dart';
+import 'package:med_sense_application/screens/patient/dashboard.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key});

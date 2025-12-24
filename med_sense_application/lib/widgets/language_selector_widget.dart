@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'translations.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class LanguageSelectorWidget extends StatelessWidget {
   const LanguageSelectorWidget({super.key});

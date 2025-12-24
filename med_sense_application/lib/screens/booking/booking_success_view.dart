@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dashboard.dart';
-import 'translations.dart';
+import 'package:med_sense_application/screens/patient/dashboard.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class BookingSuccessView extends StatelessWidget {
   final Map<String, dynamic>? appointmentDetails;

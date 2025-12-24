@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart'; 
-import 'staff_message_view.dart'; 
-import 'debug_message_view.dart'; // Import Debug View
-import 'staff_services_management_view.dart';
-import 'staff_appointments_view.dart';
-import 'staff_management_view.dart';
-import 'staff_requests_view.dart'; // Import Request View
-import 'staff_queue_view.dart'; // Import Queue View
+import 'package:med_sense_application/main.dart'; 
+import 'package:med_sense_application/screens/staff/staff_message_view.dart'; 
+import 'package:med_sense_application/screens/chat/debug_message_view.dart'; // Import Debug View
+import 'package:med_sense_application/screens/staff/staff_services_management_view.dart';
+import 'package:med_sense_application/screens/staff/staff_appointments_view.dart';
+import 'package:med_sense_application/screens/staff/staff_management_view.dart';
+import 'package:med_sense_application/screens/staff/staff_requests_view.dart'; // Import Request View
+import 'package:med_sense_application/screens/staff/staff_queue_view.dart'; // Import Queue View
 
 class StaffDashboard extends StatefulWidget {
   final String? staffName;

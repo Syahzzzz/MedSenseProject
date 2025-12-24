@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'translations.dart';
-import 'booking_summary_view.dart'; 
-import 'dashboard.dart';
+import 'package:med_sense_application/utils/translations.dart';
+import 'package:med_sense_application/screens/booking/booking_summary_view.dart'; 
+import 'package:med_sense_application/screens/patient/dashboard.dart';
 
 class ServicesView extends StatefulWidget {
   const ServicesView({super.key});

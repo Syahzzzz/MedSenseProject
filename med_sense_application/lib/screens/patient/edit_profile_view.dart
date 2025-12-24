@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'phone_number_input.dart';
+import 'package:med_sense_application/widgets/phone_number_input.dart';
 
 class EditProfileView extends StatefulWidget {
   const EditProfileView({super.key});

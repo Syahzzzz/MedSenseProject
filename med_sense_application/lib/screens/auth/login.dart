@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart'; 
-import 'signup.dart';
-import 'forgot_password.dart';
-import 'dashboard.dart';
-import 'onboarding_view.dart';
-import 'translations.dart';
-import 'language_selector_widget.dart'; 
+import 'package:med_sense_application/screens/auth/signup.dart';
+import 'package:med_sense_application/screens/auth/forgot_password.dart';
+import 'package:med_sense_application/screens/patient/dashboard.dart';
+import 'package:med_sense_application/screens/auth/onboarding_view.dart';
+import 'package:med_sense_application/utils/translations.dart';
+import 'package:med_sense_application/widgets/language_selector_widget.dart'; 
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

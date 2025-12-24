@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dashboard.dart';
-import 'translations.dart';
-import 'review_confirm_view.dart';
+import 'package:med_sense_application/screens/patient/dashboard.dart';
+import 'package:med_sense_application/utils/translations.dart';
+import 'package:med_sense_application/screens/booking/review_confirm_view.dart';
 
 class BookingDateTimeView extends StatefulWidget {
   final String serviceName;

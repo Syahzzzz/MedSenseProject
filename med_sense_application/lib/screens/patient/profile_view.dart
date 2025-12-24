@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'main.dart';
-import 'edit_profile_view.dart';
-import 'change_password_view.dart';
-import 'translations.dart';
-import 'language_selector_widget.dart';
-import 'add_card_view.dart'; 
-import 'tts_manager.dart'; // Import TTS Manager
+import 'package:med_sense_application/main.dart';
+import 'package:med_sense_application/screens/patient/edit_profile_view.dart';
+import 'package:med_sense_application/screens/auth/change_password_view.dart';
+import 'package:med_sense_application/utils/translations.dart';
+import 'package:med_sense_application/widgets/language_selector_widget.dart';
+import 'package:med_sense_application/screens/payment/add_card_view.dart'; 
+import 'package:med_sense_application/services/tts_manager.dart'; // Import TTS Manager
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});

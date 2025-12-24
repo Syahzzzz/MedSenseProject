@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'reschedule_view.dart';
+import 'package:med_sense_application/screens/booking/reschedule_view.dart';
 
 class AppointmentReceiptView extends StatefulWidget {
   final Map<String, dynamic> appointment;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'booking_datetime_view.dart';
-import 'dashboard.dart';
+import 'package:med_sense_application/screens/booking/booking_datetime_view.dart';
+import 'package:med_sense_application/screens/patient/dashboard.dart';
 
 class BookingSummaryView extends StatelessWidget {
   final String serviceCategory; 

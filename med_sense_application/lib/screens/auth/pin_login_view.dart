@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dashboard.dart';
-import 'main.dart';
-import 'translations.dart';
+import 'package:med_sense_application/screens/patient/dashboard.dart';
+import 'package:med_sense_application/main.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class PinLoginView extends StatefulWidget {
   const PinLoginView({super.key});

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for input formatters
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Added for PIN
-import 'translations.dart'; // Added for translations
+import 'package:med_sense_application/utils/translations.dart'; // Added for translations
 
 class ChangePasswordView extends StatefulWidget {
   const ChangePasswordView({super.key});

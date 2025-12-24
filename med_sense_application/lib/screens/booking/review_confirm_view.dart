@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'translations.dart';
-import 'booking_success_view.dart';
-import 'online_banking_view.dart'; // Import Online Banking View
+import 'package:med_sense_application/utils/translations.dart';
+import 'package:med_sense_application/screens/booking/booking_success_view.dart';
+import 'package:med_sense_application/screens/payment/online_banking_view.dart'; // Import Online Banking View
 
 class ReviewConfirmView extends StatefulWidget {
   final String clinicNameKey;

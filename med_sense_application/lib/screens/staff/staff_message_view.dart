@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'chat_screen.dart';
+import 'package:med_sense_application/screens/chat/chat_screen.dart';
 
 class StaffMessagesView extends StatefulWidget {
   const StaffMessagesView({super.key});

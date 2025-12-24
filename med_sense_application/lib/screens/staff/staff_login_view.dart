@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Import Shared Preferences
-import 'staff_dashboard.dart';
+import 'package:med_sense_application/screens/staff/staff_dashboard.dart';
 
 class StaffLoginView extends StatefulWidget {
   final String? branchName;

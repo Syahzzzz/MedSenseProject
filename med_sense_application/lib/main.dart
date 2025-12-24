@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'translations.dart'; // Import translations
-import 'language_selector_widget.dart'; // Import language widget
-import 'login.dart';
-import 'signup.dart';
-import 'dashboard.dart';
-import 'onboarding_view.dart';
-import 'pin_login_view.dart'; // Import Pin Login
-import 'staff_login_view.dart'; // Import Staff Login View
+import 'package:med_sense_application/utils/translations.dart'; // Import translations
+import 'package:med_sense_application/widgets/language_selector_widget.dart'; // Import language widget
+import 'package:med_sense_application/screens/auth/login.dart';
+import 'package:med_sense_application/screens/auth/signup.dart';
+import 'package:med_sense_application/screens/patient/dashboard.dart';
+import 'package:med_sense_application/screens/auth/onboarding_view.dart';
+import 'package:med_sense_application/screens/auth/pin_login_view.dart'; // Import Pin Login
+import 'package:med_sense_application/screens/staff/staff_login_view.dart'; // Import Staff Login View
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

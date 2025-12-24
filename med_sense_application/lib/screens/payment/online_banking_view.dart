@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'booking_success_view.dart';
-import 'translations.dart';
+import 'package:med_sense_application/screens/booking/booking_success_view.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class OnlineBankingView extends StatefulWidget {
   final String clinicNameKey;

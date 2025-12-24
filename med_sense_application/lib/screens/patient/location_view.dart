@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'translations.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class LocationView extends StatelessWidget {
   final VoidCallback onBack;

@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart'; 
 import 'package:shared_preferences/shared_preferences.dart'; 
-import 'main.dart'; 
-import 'location_view.dart'; 
-import 'services_view.dart'; 
-import 'profile_view.dart'; 
-import 'translations.dart';
-import 'chat_screen.dart'; 
-import 'staff_selection_view.dart'; // Imported Staff Selection
-import 'booking_history_view.dart';
-import 'notification_view.dart';
-import 'notification_service.dart';
+import 'package:med_sense_application/main.dart'; 
+import 'package:med_sense_application/screens/patient/location_view.dart'; 
+import 'package:med_sense_application/screens/patient/services_view.dart'; 
+import 'package:med_sense_application/screens/patient/profile_view.dart'; 
+import 'package:med_sense_application/utils/translations.dart';
+import 'package:med_sense_application/screens/chat/chat_screen.dart'; 
+import 'package:med_sense_application/screens/booking/staff_selection_view.dart'; // Imported Staff Selection
+import 'package:med_sense_application/screens/booking/booking_history_view.dart';
+import 'package:med_sense_application/screens/patient/notification_view.dart';
+import 'package:med_sense_application/services/notification_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});

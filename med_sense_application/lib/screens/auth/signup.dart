@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:http/http.dart' as http;
-import 'login.dart';
-import 'translations.dart';
+import 'package:med_sense_application/screens/auth/login.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -202,8 +202,9 @@ class _SignupPageState extends State<SignupPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Success! Account created.'),
+              content: Text('Success! Please check your email to verify your account.'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 5),
             ),
           );
           Navigator.pop(context);
