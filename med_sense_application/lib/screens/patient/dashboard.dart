@@ -45,7 +45,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   // Notifications
   int _unreadNotificationsCount = 0;
-  bool _hasNewBooking = false; // Add this state variable
+  bool _hasNewBooking = false; 
+  bool _hasUnreadChat = false; // New state for chat red dot
   RealtimeChannel? _notificationChannel;
 
   // --- Lifecycle ---
@@ -56,9 +57,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     _loadUserProfile();
     _fetchTopDoctors();
     _fetchUpcomingAppointment();
-    _fetchOrGenerateQueueEntry(); // Added Queue Check
+    _fetchOrGenerateQueueEntry(); 
     _fetchUnreadNotificationsCount();
-    _checkBookingNotification(); // Check for new booking
+    _checkBookingNotification(); 
+    _checkUnreadChat(); // Check for unread chats
     
     _chatAnimationController = AnimationController(
       vsync: this,
@@ -115,6 +117,25 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           },
         )
         .subscribe();
+        
+    // Listen for New Messages (Chat)
+    _supabase.channel('public:Message:${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'Message',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'recipient_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+             // Refresh unread status
+             _checkUnreadChat();
+             // Optional: Show banner notification if app is in foreground but chat not open?
+          },
+        )
+        .subscribe();
 
     // Queue Subscription (Listen for status updates)
     _supabase.channel('public:QueueEntry:${user.id}')
@@ -132,6 +153,46 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           },
         )
         .subscribe();
+  }
+
+  Future<void> _checkUnreadChat() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastViewedStr = prefs.getString('last_viewed_chat_time');
+      
+      // If never viewed, everything is "unread" if messages exist, 
+      // but usually we default to no dot until we have a baseline or just check if any message exists.
+      // Let's assume if no key, we check if any message exists.
+      
+      dynamic query = _supabase.from('Message').select('message_id').eq('recipient_id', user.id);
+      
+      if (lastViewedStr != null) {
+        query = query.gt('sent_at', lastViewedStr);
+      }
+      
+      // Re-doing query safely to just check existence (boolean)
+      var checkQuery = _supabase
+          .from('Message')
+          .select('message_id')
+          .eq('recipient_id', user.id);
+          
+      if (lastViewedStr != null) {
+        checkQuery = checkQuery.gt('sent_at', lastViewedStr);
+      }
+      
+      final res = await checkQuery.limit(1).maybeSingle();
+      
+      if (mounted) {
+        setState(() {
+          _hasUnreadChat = res != null;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error checking unread chat: $e");
+    }
   }
 
   Future<void> _fetchUnreadNotificationsCount() async {
@@ -394,16 +455,34 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             // Chat with Staff Button
             FloatingActionButton.extended(
               heroTag: 'chat_staff',
-              onPressed: () {
+              onPressed: () async {
                 // Navigate to Staff Selection
-                Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const StaffSelectionView()),
                 );
-                setState(() => _isChatExpanded = false);
+                setState(() {
+                   _isChatExpanded = false;
+                   _checkUnreadChat(); // Refresh status on return
+                });
               },
               backgroundColor: Colors.teal,
-              label: Text(AppTranslations.get('chat_with_staff'), style: const TextStyle(color: Colors.white)),
+              label: Row(
+                children: [
+                  Text(AppTranslations.get('chat_with_staff'), style: const TextStyle(color: Colors.white)),
+                  if (_hasUnreadChat) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ]
+                ],
+              ),
               icon: const Icon(Icons.people, color: Colors.white),
             ),
             const SizedBox(height: 12),
@@ -439,9 +518,27 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               });
             },
             backgroundColor: primaryYellow,
-            child: Icon(
-              _isChatExpanded ? Icons.close : Icons.chat_bubble_outline,
-              color: Colors.black,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  _isChatExpanded ? Icons.close : Icons.chat_bubble_outline,
+                  color: Colors.black,
+                ),
+                if (_hasUnreadChat && !_isChatExpanded)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -493,6 +590,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       _fetchOrGenerateQueueEntry(),
       _fetchUnreadNotificationsCount(),
       _checkBookingNotification(),
+      _checkUnreadChat(),
     ]);
   }
 

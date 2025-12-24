@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Import Shared Preferences
 import 'package:med_sense_application/main.dart'; 
 import 'package:med_sense_application/screens/staff/staff_message_view.dart'; 
 import 'package:med_sense_application/screens/chat/debug_message_view.dart'; // Import Debug View
@@ -58,34 +59,63 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
   Future<void> _fetchDashboardCounts() async {
     try {
-      // 1. Pending Appointments (Status: Confirmed or Pending - depending on what needs attention, usually newly created ones or ones needing action)
-      // Let's assume 'Confirmed' ones are upcoming and 'Pending' need confirmation.
-      // Adjust logic based on your workflow. Here counting 'Pending' + 'Confirmed' for general activity or just 'Pending' for attention.
-      // Let's count 'Pending' status as "New Appointments" requiring action.
+      // 1. Pending Appointments
       final appointmentsRes = await _supabase
           .from('Appointment')
           .count(CountOption.exact)
           .eq('status', 'Pending');
       
-      // 2. Patient Requests (Cancellation/Reschedule Requested)
+      // 2. Patient Requests
       final requestsRes = await _supabase
           .from('Appointment')
           .count(CountOption.exact)
           .or('status.eq.Cancellation Requested,status.eq.Reschedule Requested');
 
-      // 3. Unread Messages (Incoming from Patients)
-      // Wrapped in try-catch in case 'is_read' column is missing or schema differs
+      // 3. Unread Messages (Client-Side Logic)
       int messagesRes = 0;
       try {
-        messagesRes = await _supabase
-            .from('Message')
-            .count(CountOption.exact)
-            .eq('is_read', false); 
+        final prefs = await SharedPreferences.getInstance();
+        String? targetId = prefs.getString('current_staff_id');
+        
+        // If not in prefs, try to resolve via email
+        if (targetId == null) {
+          final user = _supabase.auth.currentUser;
+          if (user != null && user.email != null) {
+             final staffRecord = await _supabase
+                .from('Staff')
+                .select('staff_id')
+                .eq('email', user.email!)
+                .maybeSingle();
+             if (staffRecord != null) {
+               targetId = staffRecord['staff_id'];
+               await prefs.setString('current_staff_id', targetId!);
+             }
+          }
+        }
+
+        if (targetId != null) {
+          final lastViewedStr = prefs.getString('last_viewed_chat_time');
+          
+          if (lastViewedStr != null) {
+            // Count messages sent AFTER the last view time
+            messagesRes = await _supabase
+                .from('Message')
+                .count(CountOption.exact)
+                .eq('recipient_id', targetId)
+                .gt('sent_at', lastViewedStr); 
+          } else {
+            // Never viewed before? Count all incoming messages
+            messagesRes = await _supabase
+                .from('Message')
+                .count(CountOption.exact)
+                .eq('recipient_id', targetId);
+          }
+        }
       } catch (e) {
-        debugPrint("Message count failed (possibly missing is_read column): $e");
+        debugPrint("Message count failed: $e");
       }
 
-      // 4. Active Queue (Waiting or Serving)
+      // 4. Active Queue
       final queueRes = await _supabase
           .from('QueueEntry')
           .count(CountOption.exact)

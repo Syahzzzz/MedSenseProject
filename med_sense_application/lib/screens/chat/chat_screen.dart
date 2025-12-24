@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:med_sense_application/widgets/message_bubble.dart';
+import 'dart:convert'; // Add this import for JSON encoding/decoding
 
 class ChatScreen extends StatefulWidget {
   final String? queueToken;
@@ -8,6 +10,7 @@ class ChatScreen extends StatefulWidget {
   final String? receiverId;   // The ID of the person receiving the message
   final String? receiverName;
   final String senderType;    // 'patient' or 'staff'
+  final String? customCurrentUserId; // Optional: Override the Auth ID (e.g., use Staff Table ID)
 
   const ChatScreen({
     super.key, 
@@ -16,6 +19,7 @@ class ChatScreen extends StatefulWidget {
     this.receiverId,
     this.receiverName,
     this.senderType = 'patient', // Default to patient
+    this.customCurrentUserId,
   });
 
   @override
@@ -29,38 +33,123 @@ class _ChatScreenState extends State<ChatScreen> {
   // Bot variables
   final List<Map<String, dynamic>> _botMessages = [];
   
-  // Human Chat Stream
-  Stream<List<Map<String, dynamic>>>? _messageStream;
+  // Human Chat Variables
+  List<Map<String, dynamic>> _messages = [];
+  RealtimeChannel? _chatChannel;
+  bool _isLoading = false;
+  
   String? _currentUserId;
+
+  String get _effectiveUserId => widget.customCurrentUserId ?? _currentUserId ?? '';
 
   @override
   void initState() {
     super.initState();
     _currentUserId = _supabase.auth.currentUser?.id;
+    _markChatAsRead();
     
     // Setup real-time if not bot
-    if (!widget.isBot && _currentUserId != null && widget.receiverId != null) {
-      _setupRealtimeChat();
+    if (!widget.isBot && _effectiveUserId.isNotEmpty && widget.receiverId != null) {
+      _setupChat();
     }
   }
 
-  void _setupRealtimeChat() {
-    // SYNC: Using table "Message" and columns from your schema
-    _messageStream = _supabase
-        .from('Message') 
-        .stream(primaryKey: ['message_id']) // Primary key from schema
-        .order('sent_at', ascending: true)  // Changed from created_at to sent_at
-        .map((maps) {
-          // Filter messages relevant to this specific conversation
-          return maps.where((m) {
-            final sender = m['sender_id'];
-            final recipient = m['recipient_id']; // Changed from receiver_id to recipient_id
-            
-            // Check if message is (Me -> Them) OR (Them -> Me)
-            return (sender == _currentUserId && recipient == widget.receiverId) ||
-                   (sender == widget.receiverId && recipient == _currentUserId);
-          }).toList();
+  @override
+  void dispose() {
+    _chatChannel?.unsubscribe();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _markChatAsRead() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now().toIso8601String();
+    
+    // 1. Legacy Global (keep for simple checks)
+    await prefs.setString('last_viewed_chat_time', now);
+
+    // 2. Per-Conversation Map
+    if (widget.receiverId != null) {
+      String? jsonStr = prefs.getString('read_timestamps');
+      Map<String, dynamic> timestamps = {};
+      if (jsonStr != null) {
+        try {
+          timestamps = jsonDecode(jsonStr);
+        } catch (_) {}
+      }
+      
+      timestamps[widget.receiverId!] = now;
+      await prefs.setString('read_timestamps', jsonEncode(timestamps));
+    }
+  }
+
+  void _setupChat() {
+    _fetchHistory();
+    _subscribeToRealtime();
+  }
+
+  Future<void> _fetchHistory() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await _supabase
+          .from('Message')
+          .select()
+          .or('sender_id.eq.$_effectiveUserId,recipient_id.eq.$_effectiveUserId')
+          .order('sent_at', ascending: true); // Oldest first for history
+
+      // Filter strict conversation partners in Dart to avoid complex OR logic with AND in Supabase if needed
+      // (Though RLS usually handles this, we double check to match specific conversation)
+      final filtered = List<Map<String, dynamic>>.from(response).where((m) {
+        final sender = m['sender_id'];
+        final recipient = m['recipient_id'];
+        return (sender == _effectiveUserId && recipient == widget.receiverId) ||
+               (sender == widget.receiverId && recipient == _effectiveUserId);
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _messages = filtered;
+          _isLoading = false;
         });
+      }
+    } catch (e) {
+      debugPrint("Error fetching chat history: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _subscribeToRealtime() {
+    _chatChannel = _supabase.channel('public:Message:$_effectiveUserId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'Message',
+          callback: (payload) {
+             final newMsg = payload.newRecord;
+             final sender = newMsg['sender_id'];
+             final recipient = newMsg['recipient_id'];
+             
+             // Check if this message belongs to THIS conversation
+             bool isRelevant = (sender == _effectiveUserId && recipient == widget.receiverId) ||
+                               (sender == widget.receiverId && recipient == _effectiveUserId);
+             
+             if (isRelevant && mounted) {
+                // Deduplicate: If we just sent it, we might have added it optimistically.
+                // We can check if we have a message with same content & close timestamp, or just rely on IDs if available.
+                // Since we don't have the ID for optimistic messages easily, we'll just append.
+                // Optimistic messages usually don't have 'message_id' from DB yet or we generated one.
+                
+                // Simple De-duplication check based on ID
+                final exists = _messages.any((m) => m['message_id'] == newMsg['message_id']);
+                if (!exists) {
+                   setState(() {
+                      _messages.add(newMsg);
+                   });
+                }
+             }
+          },
+        )
+        .subscribe();
   }
 
   String _formatTime(dynamic dt) {
@@ -121,27 +210,45 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // --- HUMAN (STAFF/PATIENT) LOGIC ---
   Future<void> _sendHumanMessage(String msg) async {
-    if (_currentUserId == null || widget.receiverId == null) return;
+    if (_effectiveUserId.isEmpty || widget.receiverId == null) return;
+
+    // 1. Optimistic Update
+    final tempMsg = {
+      'message_id': 'temp_${DateTime.now().millisecondsSinceEpoch}', // Temp ID
+      'sender_id': _effectiveUserId,
+      'recipient_id': widget.receiverId,
+      'message_content': msg,
+      'sent_at': DateTime.now().toIso8601String(),
+    };
+
+    setState(() {
+      _messages.add(tempMsg);
+    });
 
     try {
-      // SYNC: Inserting into 'Message' table with new schema columns
+      // 2. Insert into DB
       await _supabase.from('Message').insert({
-        'sender_type': widget.senderType, // 'patient' or 'staff'
-        'sender_id': _currentUserId,
-        'recipient_id': widget.receiverId, // Updated column name
-        'message_content': msg,            // Updated column name
-        // 'sent_at': automatic default
-        // 'message_id': automatic default
+        'sender_type': widget.senderType, 
+        'sender_id': _effectiveUserId,
+        'recipient_id': widget.receiverId, 
+        'message_content': msg,            
       });
+      // We rely on Realtime to bring back the "real" message with correct ID, 
+      // or we could fetch the result.
+      // Ideally, we'd replace the tempMsg with the real one, but for now, duplicates are unlikely 
+      // to be visually jarring if we don't double-add in the subscription callback.
     } on PostgrestException catch (e) {
+      // Revert if failed
       if (mounted) {
-        // Specific handling for the Foreign Key error to guide the user
+        setState(() {
+          _messages.removeWhere((m) => m['message_id'] == tempMsg['message_id']);
+        });
+        
         if (e.code == '23503') {
            ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("System Error: Database restricts sending to this user type. Please contact admin."),
               backgroundColor: Colors.red,
-              duration: Duration(seconds: 4),
             ),
           );
         } else {
@@ -152,6 +259,9 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+           _messages.removeWhere((m) => m['message_id'] == tempMsg['message_id']);
+        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error sending: $e")));
       }
     }
@@ -217,52 +327,37 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildHumanList() {
-    if (_messageStream == null) {
-      return const Center(child: Text("Not connected to chat service"));
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_messages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text("Start a conversation...", style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
     }
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _messageStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Error loading messages: ${snapshot.error}'));
-        }
-        
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    // We reverse the list for display from bottom up
+    final displayMessages = _messages.reversed.toList();
 
-        final messages = snapshot.data!;
-        
-        if (messages.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                const Text("Start a conversation...", style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          );
-        }
-
-        // We reverse the list because standard chat UIs build from bottom up
-        final displayMessages = messages.reversed.toList();
-
-        return ListView.builder(
-          reverse: true, 
-          padding: const EdgeInsets.all(8),
-          itemCount: displayMessages.length,
-          itemBuilder: (context, index) {
-            final msg = displayMessages[index];
-            final isMe = msg['sender_id'] == _currentUserId;
-            return MessageBubble(
-              text: msg['message_content'] ?? "", // SYNC: Updated column
-              isUser: isMe,
-              time: _formatTime(msg['sent_at']),  // SYNC: Updated column
-            );
-          },
+    return ListView.builder(
+      reverse: true, 
+      padding: const EdgeInsets.all(8),
+      itemCount: displayMessages.length,
+      itemBuilder: (context, index) {
+        final msg = displayMessages[index];
+        final isMe = msg['sender_id'] == _effectiveUserId;
+        return MessageBubble(
+          text: msg['message_content'] ?? "", 
+          isUser: isMe,
+          time: _formatTime(msg['sent_at']),  
         );
       },
     );

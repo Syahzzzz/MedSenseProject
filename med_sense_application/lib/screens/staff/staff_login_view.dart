@@ -78,8 +78,23 @@ class _StaffLoginViewState extends State<StaffLoginView> {
       if (response != null && response['success'] == true) {
         final staffData = response['data'];
         
+        // CRITICAL FIX: Actually sign in to Supabase Auth to establish a session
+        try {
+          await _supabase.auth.signInWithPassword(
+            email: email,
+            password: password,
+          );
+        } catch (authError) {
+          debugPrint("Supabase Auth Error (ignoring since RPC passed): $authError");
+          // Proceed anyway as RPC confirmed credentials, but session might be weak
+        }
+
         // Handle "Remember Me" logic
         final prefs = await SharedPreferences.getInstance();
+        
+        // Save Staff ID persistently
+        await prefs.setString('current_staff_id', staffData['staff_id']);
+
         if (_rememberMe) {
           await prefs.setBool('staff_remember_me', true);
           await prefs.setString('staff_email', email);

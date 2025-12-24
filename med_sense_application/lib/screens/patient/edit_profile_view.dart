@@ -194,12 +194,28 @@ class _EditProfileViewState extends State<EditProfileView> {
       await _supabase.auth.updateUser(userAttributes);
 
       // 3. Update Public Patient Table
-      await _supabase.from('Patient').update({
-        'name': name,
-        'phone_number': phone,
-        'dob': dob,
-        'email': newEmail, // Warning: Changing email here without verifying might cause issues if you use email for uniqueness
-      }).eq('patient_id', user.id);
+      try {
+        await _supabase.from('Patient').update({
+          'name': name,
+          'phone_number': phone,
+          'dob': dob,
+          'email': newEmail, 
+        }).eq('patient_id', user.id);
+      } catch (e) {
+        // Main update failed
+        rethrow; 
+      }
+
+      // 4. Try to update Avatar URL separately (in case column is missing)
+      if (newAvatarUrl != null) {
+        try {
+          await _supabase.from('Patient').update({
+            'avatar_url': newAvatarUrl,
+          }).eq('patient_id', user.id);
+        } catch (e) {
+          debugPrint("Note: avatar_url column might be missing in Patient table. Error: $e");
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
