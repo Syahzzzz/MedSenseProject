@@ -63,7 +63,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _markChatAsRead() async {
     final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now().toIso8601String();
+    // Use UTC to match Supabase timestamptz
+    final now = DateTime.now().toUtc().toIso8601String();
     
     // 1. Legacy Global (keep for simple checks)
     await prefs.setString('last_viewed_chat_time', now);

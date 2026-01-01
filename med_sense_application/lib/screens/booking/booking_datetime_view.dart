@@ -182,7 +182,8 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
     final String serviceKey = _getServiceKey();
     
     try {
-      final match = _allDoctors.firstWhere((doc) {
+      // Filter all doctors that match the specialization criteria
+      final matchingDoctors = _allDoctors.where((doc) {
         final String spec = (doc['specialization'] as String? ?? '').toLowerCase();
         final String sKey = serviceKey.toLowerCase();
         
@@ -192,9 +193,18 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
         if (sKey == 'retainers' && (spec.contains('ortho') || spec.contains('general'))) return true;
         
         return false;
-      }, orElse: () => _allDoctors.first);
-      
-      _assignedDoctor = match;
+      }).toList();
+
+      if (matchingDoctors.isNotEmpty) {
+        // Use hash of service name to pick a doctor from the matches
+        // This ensures different services get different doctors (if available) but stays consistent for the same service
+        final int index = widget.serviceName.hashCode.abs() % matchingDoctors.length;
+        _assignedDoctor = matchingDoctors[index];
+      } else {
+        // Fallback: Pick a doctor from the full list using the same hash logic
+        final int index = widget.serviceName.hashCode.abs() % _allDoctors.length;
+        _assignedDoctor = _allDoctors[index];
+      }
     } catch (e) {
       _assignedDoctor = _allDoctors.first;
     }

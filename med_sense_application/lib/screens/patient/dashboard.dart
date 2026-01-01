@@ -130,9 +130,17 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             value: user.id,
           ),
           callback: (payload) {
-             // Refresh unread status
-             _checkUnreadChat();
-             // Optional: Show banner notification if app is in foreground but chat not open?
+             final newRecord = payload.newRecord;
+             if (newRecord['sender_id'] != user.id) {
+               // Directly set unread status to ensure red dot appears immediately
+               if (mounted) {
+                 setState(() {
+                   _hasUnreadChat = true;
+                 });
+                 // Refresh count if we had logic for it
+                 _fetchUnreadNotificationsCount();
+               }
+             }
           },
         )
         .subscribe();
@@ -243,7 +251,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       // 1. Check existing active queue for today
       final existingQueue = await _supabase
           .from('QueueEntry')
-          .select('*, Doctor(name)')
+          .select('*, Doctor(name, specialization), Appointment(appointment_datetime, Service(service_name))')
           .eq('patient_id', user.id)
           .gte('check_in_time', todayStart)
           .lt('check_in_time', tomorrowStart)
@@ -259,6 +267,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             _queueData = existingQueue;
             _isQueueLoading = false;
           });
+          _showQueuePopup();
         }
         return;
       }
@@ -290,7 +299,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             .limit(1)
             .maybeSingle();
 
-        int nextNum = 1;
+        int nextNum = 2001;
         if (maxQueueRes != null) {
           nextNum = (maxQueueRes['queue_number'] as int) + 1;
         }
@@ -305,7 +314,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               'queue_number': nextNum,
               'status': 'Waiting',
             })
-            .select('*, Doctor(name)')
+            .select('*, Doctor(name, specialization), Appointment(appointment_datetime, Service(service_name))')
             .single();
 
         if (mounted) {
@@ -313,6 +322,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             _queueData = newQueue;
             _isQueueLoading = false;
           });
+          _showQueuePopup();
         }
       } else {
          if (mounted) setState(() => _isQueueLoading = false);
@@ -421,6 +431,110 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         (r) => false
       );
     }
+  }
+
+  void _showQueuePopup() {
+    if (!mounted || _queueData == null) return;
+    
+    // Extract data
+    final doctor = _queueData!['Doctor'] as Map<String, dynamic>?;
+    final doctorName = doctor != null ? doctor['name'] : 'Unknown';
+    // specialization is fetched now
+    // final specialization = doctor != null ? doctor['specialization'] : '';
+
+    final appointment = _queueData!['Appointment'] as Map<String, dynamic>?;
+    String serviceName = 'General Consultation';
+    String timeStr = 'Today';
+    
+    if (appointment != null) {
+      final service = appointment['Service'] as Map<String, dynamic>?;
+      if (service != null) {
+        serviceName = service['service_name'] ?? serviceName;
+      }
+      
+      final dtStr = appointment['appointment_datetime'] as String?;
+      if (dtStr != null) {
+         final dt = DateTime.parse(dtStr).toLocal();
+         final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+         final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+         final min = dt.minute.toString().padLeft(2, '0');
+         timeStr = "$hour:$min $amPm";
+      }
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          contentPadding: const EdgeInsets.all(20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Current Queue", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              Text(
+                "${_queueData!['queue_number']}",
+                style: const TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: Color(0xFFFBC02D)),
+              ),
+              const SizedBox(height: 10),
+               Text(
+                "Status: ${_queueData!['status']}",
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue),
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 10),
+              
+              // Details
+              Row(
+                children: [
+                  const Icon(Icons.person, size: 20, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text("Dr. $doctorName", style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.medical_services, size: 20, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(serviceName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.access_time, size: 20, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(timeStr, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text("Close", style: TextStyle(color: Colors.white)),
+                ),
+              )
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _onItemTapped(int index) {

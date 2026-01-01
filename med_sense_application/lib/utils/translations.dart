@@ -193,6 +193,13 @@ class AppTranslations {
       'your_booking_was_successful': 'Your booking\nwas successful',
       'booking_success_desc': 'Booking was successful! Your request has been processed. If you have further questions or need additional assistance, feel free to contact our support team. Thank you for using our service!',
       'proceed_homepage': 'Proceed to homepage',
+
+      // --- Queue Reminder ---
+      'queue_reminder_title': 'Queue Reminder',
+      'queue_active_msg': 'You have an active queue number.',
+      'queue_no': 'Queue No',
+      'please_stay_alert': 'Please stay alert for your number.',
+      'room': 'Room',
     },
     'Bahasa Melayu': {
       // --- Auth ---
@@ -376,6 +383,13 @@ class AppTranslations {
       'your_booking_was_successful': 'Tempahan anda\nberjaya',
       'booking_success_desc': 'Tempahan berjaya! Permintaan anda telah diproses. Jika ada pertanyaan, hubungi sokongan kami. Terima kasih menggunakan perkhidmatan kami!',
       'proceed_homepage': 'Teruskan ke laman utama',
+
+      // --- Queue Reminder ---
+      'queue_reminder_title': 'Peringatan Giliran',
+      'queue_active_msg': 'Anda mempunyai nombor giliran aktif.',
+      'queue_no': 'No. Giliran',
+      'please_stay_alert': 'Sila peka dengan nombor anda.',
+      'room': 'Bilik',
     },
     'Mandarin': {
       // --- Auth ---
@@ -559,6 +573,13 @@ class AppTranslations {
       'your_booking_was_successful': '您的预订\n成功',
       'booking_success_desc': '预订成功！您的请求已处理。如果您有任何问题或需要进一步的帮助，请随时联系我们的支持团队。感谢您使用我们的服务！',
       'proceed_homepage': '前往主页',
+
+      // --- Queue Reminder ---
+      'queue_reminder_title': '排队提醒',
+      'queue_active_msg': '您有一个活跃的排队号码。',
+      'queue_no': '排队号码',
+      'please_stay_alert': '请留意您的号码。',
+      'room': '房间',
     },
   };
 }

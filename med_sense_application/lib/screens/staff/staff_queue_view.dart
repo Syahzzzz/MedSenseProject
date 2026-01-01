@@ -59,27 +59,42 @@ class _StaffQueueViewState extends State<StaffQueueView> {
   Future<void> _updateStatus(String queueId, String newStatus) async {
     try {
       Map<String, dynamic> updates = {'status': newStatus};
+      dynamic finalRoomForMessage;
 
       // Room Assignment Logic when Calling
       if (newStatus == 'Serving') {
-        // ... (existing room logic)
-        final servingRes = await _supabase
-            .from('QueueEntry')
-            .select('assigned_room')
-            .eq('status', 'Serving');
+        // 1. Check if room is already assigned (e.g. via Walk-In Registration)
+        final currentEntry = _queueEntries.firstWhere(
+          (element) => element['queue_id'] == queueId,
+          orElse: () => {},
+        );
         
-        final List<dynamic> data = servingRes; 
-        final usedRooms = data
-            .map((e) => e['assigned_room'] as int?)
-            .where((e) => e != null)
-            .toSet();
+        final existingRoom = currentEntry['assigned_room'];
 
-        int assignedRoom = 101;
-        if (usedRooms.contains(101)) {
-          assignedRoom = 102;
-        } 
-        
-        updates['assigned_room'] = assignedRoom;
+        if (existingRoom != null) {
+          // Use existing room
+          finalRoomForMessage = existingRoom;
+        } else {
+          // Only auto-assign if NO room is currently assigned
+          final servingRes = await _supabase
+              .from('QueueEntry')
+              .select('assigned_room')
+              .eq('status', 'Serving');
+          
+          final List<dynamic> data = servingRes; 
+          final usedRooms = data
+              .map((e) => e['assigned_room'] as int?)
+              .where((e) => e != null)
+              .toSet();
+
+          int assignedRoom = 101;
+          if (usedRooms.contains(101)) {
+            assignedRoom = 102;
+          } 
+          
+          updates['assigned_room'] = assignedRoom;
+          finalRoomForMessage = assignedRoom;
+        }
       }
       
       // Auto-update Appointment status if Queue is Completed
@@ -110,7 +125,9 @@ class _StaffQueueViewState extends State<StaffQueueView> {
       
       if (mounted) {
          String msg = 'Status updated to $newStatus';
-         if (newStatus == 'Serving') msg = 'Calling Patient to Room ${updates['assigned_room']}';
+         if (newStatus == 'Serving' && finalRoomForMessage != null) {
+            msg = 'Calling Patient to Room $finalRoomForMessage';
+         }
          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert' as import_convert;
 import 'package:shared_preferences/shared_preferences.dart'; // Import Shared Preferences
 import 'package:med_sense_application/main.dart'; 
 import 'package:med_sense_application/screens/staff/staff_message_view.dart'; 
@@ -9,6 +10,7 @@ import 'package:med_sense_application/screens/staff/staff_appointments_view.dart
 import 'package:med_sense_application/screens/staff/staff_management_view.dart';
 import 'package:med_sense_application/screens/staff/staff_requests_view.dart'; // Import Request View
 import 'package:med_sense_application/screens/staff/staff_queue_view.dart'; // Import Queue View
+import 'package:med_sense_application/screens/staff/walk_in_registration_view.dart'; // Import Walk-In View
 
 class StaffDashboard extends StatefulWidget {
   final String? staffName;
@@ -94,22 +96,51 @@ class _StaffDashboardState extends State<StaffDashboard> {
         }
 
         if (targetId != null) {
-          final lastViewedStr = prefs.getString('last_viewed_chat_time');
-          
-          if (lastViewedStr != null) {
-            // Count messages sent AFTER the last view time
-            messagesRes = await _supabase
-                .from('Message')
-                .count(CountOption.exact)
-                .eq('recipient_id', targetId)
-                .gt('sent_at', lastViewedStr); 
-          } else {
-            // Never viewed before? Count all incoming messages
-            messagesRes = await _supabase
-                .from('Message')
-                .count(CountOption.exact)
-                .eq('recipient_id', targetId);
+          // Fetch recent messages to determine unread status per conversation
+          // We limit to 50 for performance, assuming unread messages are recent
+          final msgs = await _supabase
+              .from('Message')
+              .select('sender_id, recipient_id, sent_at')
+              .or('sender_id.eq.$targetId,recipient_id.eq.$targetId')
+              .order('sent_at', ascending: false)
+              .limit(50);
+
+          // Load read timestamps
+          String? jsonStr = prefs.getString('read_timestamps');
+          Map<String, dynamic> readTimestamps = {};
+          if (jsonStr != null) {
+            try {
+              readTimestamps = import_convert.jsonDecode(jsonStr);
+            } catch (_) {}
           }
+
+          final Set<String> unreadSenders = {};
+
+          for (var m in msgs) {
+            final sender = m['sender_id'].toString();
+            // Only check incoming messages (where I am recipient)
+            if (sender != targetId) {
+               final sentAtStr = m['sent_at'] as String;
+               final sentAt = DateTime.parse(sentAtStr); // Supabase returns UTC ISO
+               
+               final lastReadStr = readTimestamps[sender];
+               
+               bool isUnread = false;
+               if (lastReadStr == null) {
+                 isUnread = true; // Never read this person
+               } else {
+                 final lastRead = DateTime.parse(lastReadStr); // Saved as UTC ISO
+                 if (sentAt.isAfter(lastRead)) {
+                   isUnread = true;
+                 }
+               }
+               
+               if (isUnread) {
+                 unreadSenders.add(sender);
+               }
+            }
+          }
+          messagesRes = unreadSenders.length;
         }
       } catch (e) {
         debugPrint("Message count failed: $e");
@@ -255,6 +286,13 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   ).then((_) => _fetchDashboardCounts());
                 }, badgeCount: _pendingAppointmentsCount),
                 
+                _buildStaffAction(Icons.person_add, "Walk-In Registration", "Register immediate walk-in patients", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const WalkInRegistrationView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }),
+
                 _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
                    Navigator.push(
                     context,
@@ -297,6 +335,13 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     MaterialPageRoute(builder: (context) => const StaffAppointmentsView()),
                   ).then((_) => _fetchDashboardCounts());
                 }, badgeCount: _pendingAppointmentsCount),
+
+                _buildStaffAction(Icons.person_add, "Walk-In Registration", "Register immediate walk-in patients", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const WalkInRegistrationView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }),
                 
                 _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
                    Navigator.push(
