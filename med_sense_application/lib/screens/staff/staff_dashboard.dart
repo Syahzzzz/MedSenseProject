@@ -279,6 +279,13 @@ class _StaffDashboardState extends State<StaffDashboard> {
               
               // Staff Actions List
               if (widget.isAdmin == true) ...[
+                _buildStaffAction(Icons.list_alt, "Queue System", "Monitor live queue", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StaffQueueView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }, badgeCount: _activeQueueCount),
+
                 _buildStaffAction(Icons.calendar_today, "Appointments Management", "View and manage bookings", () {
                    Navigator.push(
                     context,
@@ -286,12 +293,12 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   ).then((_) => _fetchDashboardCounts());
                 }, badgeCount: _pendingAppointmentsCount),
                 
-                _buildStaffAction(Icons.person_add, "Walk-In Registration", "Register immediate walk-in patients", () {
+                _buildStaffAction(Icons.chat, "Patient Messages", "Chat with patients", () {
                    Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const WalkInRegistrationView()),
+                    MaterialPageRoute(builder: (context) => const StaffMessagesView()),
                   ).then((_) => _fetchDashboardCounts());
-                }),
+                }, badgeCount: _unreadMessagesCount),
 
                 _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
                    Navigator.push(
@@ -300,19 +307,19 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   ).then((_) => _fetchDashboardCounts());
                 }, badgeCount: _patientRequestsCount),
                 
+                _buildStaffAction(Icons.person_add, "Walk-In Registration", "Register immediate walk-in patients", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const WalkInRegistrationView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }),
+
                 _buildStaffAction(Icons.edit_note, "Services Management", "Add, edit, or remove services", () {
                   Navigator.push(
                     context, 
                     MaterialPageRoute(builder: (context) => const StaffServicesManagementView())
                   );
                 }),
-                
-                _buildStaffAction(Icons.chat, "Patient Messages", "Chat with patients", () {
-                   Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const StaffMessagesView()),
-                  ).then((_) => _fetchDashboardCounts());
-                }, badgeCount: _unreadMessagesCount),
                 
                 _buildStaffAction(Icons.manage_accounts, "Staff & Doctor Registry", "Manage clinic personnel", () {
                   Navigator.push(
@@ -321,14 +328,14 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   );
                 }),
                 
-                _buildStaffAction(Icons.list_alt, "Queue System", "Monitor live queue", () {
-                  Navigator.push(
+              ] else ...[
+                _buildStaffAction(Icons.list_alt, "Queue View", "Monitor live queue", () {
+                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const StaffQueueView()),
                   ).then((_) => _fetchDashboardCounts());
                 }, badgeCount: _activeQueueCount),
-                
-              ] else ...[
+
                 _buildStaffAction(Icons.calendar_today, "Appointments", "View bookings", () {
                    Navigator.push(
                     context,
@@ -336,20 +343,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   ).then((_) => _fetchDashboardCounts());
                 }, badgeCount: _pendingAppointmentsCount),
 
-                _buildStaffAction(Icons.person_add, "Walk-In Registration", "Register immediate walk-in patients", () {
-                   Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const WalkInRegistrationView()),
-                  ).then((_) => _fetchDashboardCounts());
-                }),
-                
-                _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
-                   Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const StaffRequestsView()),
-                  ).then((_) => _fetchDashboardCounts());
-                }, badgeCount: _patientRequestsCount),
-                
                 _buildStaffAction(Icons.chat, "Messages", "Chat with patients", () {
                    Navigator.push(
                     context,
@@ -357,12 +350,19 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   ).then((_) => _fetchDashboardCounts());
                 }, badgeCount: _unreadMessagesCount),
                 
-                _buildStaffAction(Icons.list_alt, "Queue View", "Monitor live queue", () {
+                _buildStaffAction(Icons.approval, "Patient Requests", "Handle cancellations & rescheduling", () {
                    Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const StaffQueueView()),
+                    MaterialPageRoute(builder: (context) => const StaffRequestsView()),
                   ).then((_) => _fetchDashboardCounts());
-                }, badgeCount: _activeQueueCount),
+                }, badgeCount: _patientRequestsCount),
+
+                _buildStaffAction(Icons.person_add, "Walk-In Registration", "Register immediate walk-in patients", () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const WalkInRegistrationView()),
+                  ).then((_) => _fetchDashboardCounts());
+                }),
               ]
             ],
           ),
