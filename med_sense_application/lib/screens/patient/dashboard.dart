@@ -314,6 +314,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         final myQueueNum = existingQueue['queue_number'] as int;
         final doctorId = existingQueue['doctor_id'];
         final currentStatus = existingQueue['status'] as String?;
+        final doctorName = existingQueue['Doctor']?['name'] ?? 'Unknown';
         
         // STATUS CHANGE DETECTION (Serving)
         if (currentStatus == 'Serving' && _lastQueueStatus != 'Serving') {
@@ -333,7 +334,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             .eq('status', 'Waiting')
             .lt('queue_number', myQueueNum);
 
-        _calculateTrafficInfo();
+        _calculateTrafficInfo(doctorName);
 
         if (mounted) {
           setState(() {
@@ -351,7 +352,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
       final eligibleAppointment = await _supabase
           .from('Appointment')
-          .select()
+          .select('*, Doctor(name)') // Fetch doctor name for traffic calc
           .eq('patient_id', user.id)
           .eq('status', 'Confirmed')
           .gte('appointment_datetime', nowUtcStr)
@@ -389,8 +390,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             })
             .select('*, Doctor(name, specialization), Appointment(appointment_datetime, Service(service_name))')
             .single();
-
-        _calculateTrafficInfo();
+        
+        final doctorName = eligibleAppointment['Doctor']?['name'] ?? 'Unknown';
+        _calculateTrafficInfo(doctorName);
+        
         // New entry, so people ahead is likely 0 unless we query again, but let's assume 0 or query:
         // Actually, better to query to be safe
         final peopleCount = await _supabase
@@ -418,9 +421,30 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     }
   }
 
-  void _calculateTrafficInfo() {
+  String _getClinicKeyForDoctor(String doctorName) {
+    // Mock Logic for Multi-Clinic Support
+    final name = doctorName.toLowerCase();
+    if (name.contains('sarah') || name.contains('jane') || name.contains('lee')) {
+      return 'dental_clinic_rawang';
+    } else if (name.contains('ali') || name.contains('ahmad') || name.contains('tan')) {
+      return 'dental_clinic_selayang';
+    } else {
+      return 'dental_clinic_kl';
+    }
+  }
+
+  void _calculateTrafficInfo(String doctorName) {
     final now = DateTime.now();
     final hour = now.hour;
+    final clinicKey = _getClinicKeyForDoctor(doctorName);
+    
+    // Base Travel Time by Location (Mock)
+    int baseMinutes = 20; // Rawang (Closest)
+    if (clinicKey == 'dental_clinic_selayang') baseMinutes = 35;
+    if (clinicKey == 'dental_clinic_kl') baseMinutes = 60;
+
+    // Traffic Multiplier
+    double multiplier = 1.0;
     
     // Malaysia Traffic Simulation
     // Morning Peak: 7-9
@@ -429,14 +453,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     if ((hour >= 7 && hour < 10) || (hour >= 17 && hour < 20)) {
       _trafficStatus = "Heavy (Peak Hour)";
-      _travelTimeMinutes = 45; // 45 mins base for peak
+      multiplier = 1.5; // +50% time
     } else if (hour >= 12 && hour < 14) {
       _trafficStatus = "Moderate";
-      _travelTimeMinutes = 30;
+      multiplier = 1.2; // +20% time
     } else {
       _trafficStatus = "Clear";
-      _travelTimeMinutes = 20;
+      multiplier = 1.0;
     }
+
+    _travelTimeMinutes = (baseMinutes * multiplier).round();
   }
 
   // --- Fetch Appointment ---
@@ -1023,6 +1049,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final doctorName = doctor != null ? doctor['name'] : 'Available Doctor';
     final doctorDisplay = doctorName.toString().startsWith("Dr.") ? doctorName : "Dr. $doctorName";
 
+    // Clinic Name
+    final clinicKey = _getClinicKeyForDoctor(doctorName.toString());
+    final clinicName = AppTranslations.get(clinicKey);
+
     // Room Number
     final roomNum = _queueData!['assigned_room'];
     String roomText = roomNum != null ? "Room $roomNum" : "Room: TBD";
@@ -1094,10 +1124,17 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Icon(Icons.medical_services_outlined, color: Colors.white70, size: 16),
-                  const SizedBox(width: 8),
-                  Text(doctorDisplay, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                  const Icon(Icons.medical_services_outlined, color: Colors.white70, size: 24),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(doctorDisplay, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(clinicName, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 11)),
+                    ],
+                  ),
                 ],
               ),
               Container(
@@ -1384,8 +1421,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       children: [
                         Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
                         const SizedBox(width: 4),
-                        // Assuming location is static for now, or could be fetched from clinic if stored
-                        Text(AppTranslations.get('dental_clinic_rawang'), style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500)),
+                        // Fetch clinic based on doctor
+                        Text(AppTranslations.get(_getClinicKeyForDoctor(doctorName)), style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ],
