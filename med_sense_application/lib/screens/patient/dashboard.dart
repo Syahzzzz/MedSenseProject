@@ -42,6 +42,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   // Queue Data
   bool _isQueueLoading = true;
   Map<String, dynamic>? _queueData;
+  String? _lastQueueStatus;
+  int _peopleAhead = 0;
+  String _trafficStatus = "Clear";
+  int _travelTimeMinutes = 20; // Default base
 
   // Notifications
   int _unreadNotificationsCount = 0;
@@ -158,9 +162,53 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           ),
           callback: (payload) {
              _fetchOrGenerateQueueEntry();
+             
+             final newRecord = payload.newRecord;
+             if (newRecord['status'] == 'Serving') {
+               // 1. Notification
+               NotificationService().showNotification(
+                 DateTime.now().millisecondsSinceEpoch ~/ 1000, 
+                 'MedSense Queue', 
+                 "It's your turn! Please proceed to the room."
+               );
+               
+               // 2. Popup
+               if (mounted) {
+                 _showNowServingDialog(newRecord);
+               }
+             }
           },
         )
         .subscribe();
+  }
+
+  void _showNowServingDialog(Map<String, dynamic> record) {
+    final room = record['assigned_room'] ?? "the assigned room";
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_active, color: Colors.green),
+            SizedBox(width: 10),
+            Text("It's Your Turn!", style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          "Your queue number ${record['queue_number']} has been called.\n\nPlease proceed to Room $room immediately.",
+          style: const TextStyle(fontSize: 16),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text("I'm on my way", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkUnreadChat() async {
@@ -262,12 +310,37 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           .maybeSingle();
 
       if (existingQueue != null) {
+        // Calculate People Ahead
+        final myQueueNum = existingQueue['queue_number'] as int;
+        final doctorId = existingQueue['doctor_id'];
+        final currentStatus = existingQueue['status'] as String?;
+        
+        // STATUS CHANGE DETECTION (Serving)
+        if (currentStatus == 'Serving' && _lastQueueStatus != 'Serving') {
+           NotificationService().showNotification(
+             DateTime.now().millisecondsSinceEpoch ~/ 1000, 
+             'MedSense Queue', 
+             "It's your turn! Please proceed to the room."
+           );
+           if (mounted) _showNowServingDialog(existingQueue);
+        }
+        _lastQueueStatus = currentStatus;
+
+        final peopleCount = await _supabase
+            .from('QueueEntry')
+            .count(CountOption.exact)
+            .eq('doctor_id', doctorId)
+            .eq('status', 'Waiting')
+            .lt('queue_number', myQueueNum);
+
+        _calculateTrafficInfo();
+
         if (mounted) {
           setState(() {
             _queueData = existingQueue;
+            _peopleAhead = peopleCount;
             _isQueueLoading = false;
           });
-          _showQueuePopup();
         }
         return;
       }
@@ -317,9 +390,20 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             .select('*, Doctor(name, specialization), Appointment(appointment_datetime, Service(service_name))')
             .single();
 
+        _calculateTrafficInfo();
+        // New entry, so people ahead is likely 0 unless we query again, but let's assume 0 or query:
+        // Actually, better to query to be safe
+        final peopleCount = await _supabase
+            .from('QueueEntry')
+            .count(CountOption.exact)
+            .eq('doctor_id', eligibleAppointment['doctor_id'])
+            .eq('status', 'Waiting')
+            .lt('queue_number', nextNum);
+
         if (mounted) {
           setState(() {
             _queueData = newQueue;
+            _peopleAhead = peopleCount;
             _isQueueLoading = false;
           });
           _showQueuePopup();
@@ -331,6 +415,27 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     } catch (e) {
       debugPrint("Queue Error: $e");
       if (mounted) setState(() => _isQueueLoading = false);
+    }
+  }
+
+  void _calculateTrafficInfo() {
+    final now = DateTime.now();
+    final hour = now.hour;
+    
+    // Malaysia Traffic Simulation
+    // Morning Peak: 7-9
+    // Evening Peak: 17-19
+    // Lunch: 12-14
+    
+    if ((hour >= 7 && hour < 10) || (hour >= 17 && hour < 20)) {
+      _trafficStatus = "Heavy (Peak Hour)";
+      _travelTimeMinutes = 45; // 45 mins base for peak
+    } else if (hour >= 12 && hour < 14) {
+      _trafficStatus = "Moderate";
+      _travelTimeMinutes = 30;
+    } else {
+      _trafficStatus = "Clear";
+      _travelTimeMinutes = 20;
     }
   }
 
@@ -911,7 +1016,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
     final queueNum = _queueData!['queue_number'];
     final status = _queueData!['status'];
-    // arrival_time tracks the user's manual check-in
     final arrivalTimeStr = _queueData!['arrival_time'] as String?;
     
     // Doctor Name
@@ -923,186 +1027,232 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final roomNum = _queueData!['assigned_room'];
     String roomText = roomNum != null ? "Room $roomNum" : "Room: TBD";
 
-    // Prediction Logic based on Appointment Time
-    String predictionLabel = "Est. Arrival";
-    String predictionTime = "--:--";
-    
-    if (_upcomingAppointment != null) {
-       final dtStr = _upcomingAppointment!['appointment_datetime'] as String;
-       final dt = DateTime.parse(dtStr).toLocal();
-       // "Smart" Prediction: Suggest arriving 15 mins early
-       final arrivalTime = dt.subtract(const Duration(minutes: 15));
-       final amPm = arrivalTime.hour >= 12 ? 'PM' : 'AM';
-       final hour = arrivalTime.hour > 12 ? arrivalTime.hour - 12 : (arrivalTime.hour == 0 ? 12 : arrivalTime.hour);
-       predictionTime = "$hour:${arrivalTime.minute.toString().padLeft(2, '0')} $amPm";
-    } else {
-       // If no appointment logic but queue exists (e.g. walk-in), just show current time or "Now"
-       predictionTime = "Now";
-    }
-
     Color statusColor = const Color(0xFF2196F3); // Blue
     String statusText = "Waiting";
     
     if (status == 'Serving') {
       statusColor = const Color(0xFF4CAF50); // Green
-      if (roomNum != null) {
-        statusText = "Proceed to Room $roomNum";
-      } else {
-        statusText = "Proceed to Room"; 
-      }
+      statusText = "Now Serving";
+    } else if (status == 'Missed') {
+      statusColor = Colors.red;
+      statusText = "Missed";
     }
+
+    // --- Prediction Logic ---
+    // 1. Est Wait Time (Queue)
+    // Assume 15 mins per person ahead
+    // If Status is Serving, wait time is 0 (or almost 0)
+    int estWaitMinutes = _peopleAhead * 15;
+    if (estWaitMinutes == 0 && status == 'Waiting') estWaitMinutes = 5; // Min wait
+    if (status == 'Serving') estWaitMinutes = 0;
+
+    // 2. Times
+    final now = DateTime.now();
+    final estServiceTime = now.add(Duration(minutes: estWaitMinutes));
+    
+    // Target Arrival: 10 mins before service
+    final targetArrival = estServiceTime.subtract(const Duration(minutes: 10));
+    
+    // Time to Leave: Target Arrival - Travel Time
+    final timeToLeave = targetArrival.subtract(Duration(minutes: _travelTimeMinutes));
+
+    // Formatting
+    String formatTime(DateTime dt) {
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final min = dt.minute.toString().padLeft(2, '0');
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return "$hour:$min $amPm";
+    }
+
+    // Traffic Color
+    Color trafficColor = Colors.greenAccent;
+    if (_trafficStatus.contains("Heavy")) trafficColor = Colors.redAccent;
+    if (_trafficStatus.contains("Moderate")) trafficColor = Colors.orangeAccent;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: statusColor,
+        gradient: LinearGradient(
+          colors: [statusColor, statusColor.withBlue(((statusColor.b * 255).round() + 20).clamp(0, 255))],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
            BoxShadow(
-            color: statusColor.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: statusColor.withValues(alpha: 0.4),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Top Row: Doctor & Room info
+          // Header: Doctor & Room
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.person, color: Colors.white70, size: 16),
-                  const SizedBox(width: 5),
-                  Text(doctorDisplay, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const Icon(Icons.medical_services_outlined, color: Colors.white70, size: 16),
+                  const SizedBox(width: 8),
+                  Text(doctorDisplay, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(5)
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8)
                 ),
-                child: Text(roomText, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                child: Text(roomText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
               )
             ],
           ),
-          const SizedBox(height: 15),
           
+          const SizedBox(height: 20),
+          
+          // Main Queue Display
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Queue Number", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text("Queue Number", style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13)),
                   Text(
                     "$queueNum", 
-                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)
+                    style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold, height: 1.1)
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Text(
-                  statusText,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                   Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      statusText.toUpperCase(),
+                      style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (status == 'Waiting')
+                    Text("$_peopleAhead people ahead", style: const TextStyle(color: Colors.white, fontSize: 12)),
+                ],
               )
             ],
           ),
+          
           const SizedBox(height: 20),
+          
+          // Smart Prediction Card (Embedded)
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(15),
             ),
-            child: Row(
+            child: Column(
               children: [
-                // Section 1: Check In Status or Button
-                Expanded(
-                  child: arrivalTimeStr != null 
-                    ? _buildCheckedInState(arrivalTimeStr)
-                    : _buildCheckInButton(statusColor),
+                // Row 1: Traffic Info
+                Row(
+                  children: [
+                    Icon(Icons.traffic, color: trafficColor, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "Traffic: $_trafficStatus", 
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)
+                      ),
+                    ),
+                    Text(
+                      "+$_travelTimeMinutes min", 
+                      style: const TextStyle(color: Colors.white70, fontSize: 13)
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(color: Colors.white12, height: 1),
                 ),
                 
-                // Vertical Divider
-                Container(
-                  width: 1, 
-                  height: 40, 
-                  color: Colors.white24, 
-                  margin: const EdgeInsets.symmetric(horizontal: 10)
-                ),
-                
-                // Section 2: Smart Estimation
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(predictionLabel, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time_filled, color: Colors.white, size: 14),
-                          const SizedBox(width: 5),
-                          Text(predictionTime, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                        ],
-                      )
-                    ],
-                  ),
+                // Row 2: Prediction Grid
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildPredictionItem("Est. Service", formatTime(estServiceTime)),
+                    _buildPredictionItem("Target Arrival", formatTime(targetArrival)),
+                    _buildPredictionItem("Time to Leave", formatTime(timeToLeave), isHighlight: true),
+                  ],
                 ),
               ],
             ),
-          )
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Action Button (Check In)
+          if (arrivalTimeStr == null && status != 'Completed' && status != 'Missed')
+            SizedBox(
+              width: double.infinity,
+              height: 45,
+              child: ElevatedButton.icon(
+                onPressed: _confirmArrival,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: statusColor,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.touch_app),
+                label: const Text("I have arrived at the clinic", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            )
+          else if (arrivalTimeStr != null)
+             Container(
+               padding: const EdgeInsets.symmetric(vertical: 10),
+               width: double.infinity,
+               decoration: BoxDecoration(
+                 border: Border.all(color: Colors.white30),
+                 borderRadius: BorderRadius.circular(12)
+               ),
+               child: Row(
+                 mainAxisAlignment: MainAxisAlignment.center,
+                 children: [
+                   const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                   const SizedBox(width: 8),
+                   const Text("You are checked in", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                   const SizedBox(width: 8),
+                   Text("(${formatTime(DateTime.parse(arrivalTimeStr).toLocal())})", style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                 ],
+               ),
+             )
         ],
       ),
     );
   }
 
-  Widget _buildCheckedInState(String arrivalTimeStr) {
-    final dt = DateTime.parse(arrivalTimeStr).toLocal();
-    final amPm = dt.hour >= 12 ? 'PM' : 'AM';
-    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-    final timeStr = "$hour:${dt.minute.toString().padLeft(2, '0')} $amPm";
-
+  Widget _buildPredictionItem(String label, String time, {bool isHighlight = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Checked In", style: TextStyle(color: Colors.white70, fontSize: 10)),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
         const SizedBox(height: 4),
-        Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 14),
-            const SizedBox(width: 5),
-            Text(timeStr, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildCheckInButton(Color primaryColor) {
-    return SizedBox(
-      height: 40,
-      child: ElevatedButton.icon(
-        onPressed: _confirmArrival,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: primaryColor,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        Text(
+          time, 
+          style: TextStyle(
+            color: isHighlight ? const Color(0xFFFFD740) : Colors.white, // Amber for highlight
+            fontSize: 15, 
+            fontWeight: FontWeight.bold
+          )
         ),
-        icon: const Icon(Icons.touch_app, size: 18),
-        label: const Text("Check In Now", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-      ),
+      ],
     );
   }
 
