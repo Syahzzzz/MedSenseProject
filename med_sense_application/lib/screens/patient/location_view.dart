@@ -4,11 +4,20 @@ import 'package:med_sense_application/utils/translations.dart';
 
 class LocationView extends StatelessWidget {
   final VoidCallback onBack;
+  final bool isOkuMode;
+  final VoidCallback? onChatStaff;
+  final VoidCallback? onChatBot;
 
-  const LocationView({super.key, required this.onBack});
+  const LocationView({
+    super.key,
+    required this.onBack,
+    this.isOkuMode = false,
+    this.onChatStaff,
+    this.onChatBot,
+  });
 
   void _handleBack(BuildContext context) {
-    onBack(); 
+    onBack();
   }
 
   // Function to launch Google Maps
@@ -27,6 +36,8 @@ class LocationView extends StatelessWidget {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     // Clinic data with real Google Maps query links
@@ -39,7 +50,8 @@ class LocationView extends StatelessWidget {
         'closing_time': '10:00 pm',
         'image': 'images/clinic_rawang.png',
         // Directs to Q & M Dental Clinic (Rawang)
-        'mapUrl': 'https://www.google.com/maps/search/?api=1&query=Q+%26+M+Dental+Clinic+(Rawang)',
+        'mapUrl':
+            'https://www.google.com/maps/search/?api=1&query=Q+%26+M+Dental+Clinic+(Rawang)',
       },
       {
         'name': AppTranslations.get('dental_clinic_selayang'),
@@ -47,9 +59,10 @@ class LocationView extends StatelessWidget {
         'rating': 4.8,
         'reviews': 520,
         'closing_time': '9:30 pm',
-        'image': 'images/clinic_selayang.png', 
+        'image': 'images/clinic_selayang.png',
         // Directs to Qualiteeth Dental Clinic Selayang
-        'mapUrl': 'https://www.google.com/maps/search/?api=1&query=Qualiteeth+Dental+Clinic+Selayang',
+        'mapUrl':
+            'https://www.google.com/maps/search/?api=1&query=Qualiteeth+Dental+Clinic+Selayang',
       },
       {
         'name': AppTranslations.get('dental_clinic_kl'),
@@ -57,9 +70,10 @@ class LocationView extends StatelessWidget {
         'rating': 5.0,
         'reviews': 1200,
         'closing_time': '11:00 pm',
-        'image': 'images/clinic_kl.png', 
+        'image': 'images/clinic_kl.png',
         // Directs to Sentral Dental Clinic (near KL Sentral)
-        'mapUrl': 'https://www.google.com/maps/search/?api=1&query=Sentral+Dental+Clinic+KL+Sentral',
+        'mapUrl':
+            'https://www.google.com/maps/search/?api=1&query=Sentral+Dental+Clinic+KL+Sentral',
       },
     ];
 
@@ -74,23 +88,26 @@ class LocationView extends StatelessWidget {
               // --- Back Arrow ---
               GestureDetector(
                 onTap: () => _handleBack(context),
-                child: const Icon(Icons.arrow_back, size: 28, color: Colors.black),
+                child:
+                    const Icon(Icons.arrow_back, size: 28, color: Colors.black),
               ),
-              
+
               const SizedBox(height: 20),
 
               // --- Header ---
               Text(
                 AppTranslations.get('choose_location'),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-              
+
               const SizedBox(height: 20),
 
               // --- Subheader ---
               Text(
                 AppTranslations.get('dental_clinic_sub'),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               Text(
                 "${clinics.length} ${AppTranslations.get('locations_count_suffix')}",
@@ -110,7 +127,8 @@ class LocationView extends StatelessWidget {
                       onTap: () => _launchMap(context, clinic['mapUrl']),
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 25),
-                        color: Colors.transparent, // Ensures hit test works on empty space
+                        color: Colors.transparent,
+                        // Ensures hit test works on empty space
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -124,7 +142,8 @@ class LocationView extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(15),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.grey.withValues(alpha: 0.2),
+                                        color:
+                                            Colors.grey.withValues(alpha: 0.2),
                                         spreadRadius: 2,
                                         blurRadius: 5,
                                         offset: const Offset(0, 3),
@@ -136,17 +155,25 @@ class LocationView extends StatelessWidget {
                                     child: Image.asset(
                                       clinic['image'],
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         return Container(
                                           color: Colors.grey[300],
                                           child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
                                             children: [
-                                              const Icon(Icons.image_not_supported, color: Colors.grey, size: 40),
+                                              const Icon(
+                                                  Icons.image_not_supported,
+                                                  color: Colors.grey,
+                                                  size: 40),
                                               const SizedBox(height: 8),
                                               Text(
-                                                AppTranslations.get('image_not_found'),
-                                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                                AppTranslations.get(
+                                                    'image_not_found'),
+                                                style: TextStyle(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 12),
                                               ),
                                             ],
                                           ),
@@ -162,44 +189,55 @@ class LocationView extends StatelessWidget {
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.1),
-                                          blurRadius: 4,
-                                        )
-                                      ]
-                                    ),
-                                    child: const Icon(Icons.directions, color: Color(0xFF1976D2), size: 24),
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.1),
+                                            blurRadius: 4,
+                                          )
+                                        ]),
+                                    child: const Icon(Icons.directions,
+                                        color: Color(0xFF1976D2), size: 24),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 12),
-                            
+
                             // Title
                             Text(
                               clinic['name'],
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 4),
-                            
+
                             // Rating
                             Row(
                               children: [
                                 Text(
                                   "${clinic['rating']} ",
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
                                 ),
-                                const Icon(Icons.star, size: 14, color: Colors.black),
-                                const Icon(Icons.star, size: 14, color: Colors.black),
-                                const Icon(Icons.star, size: 14, color: Colors.black),
-                                const Icon(Icons.star, size: 14, color: Colors.black),
-                                const Icon(Icons.star, size: 14, color: Colors.black),
+                                const Icon(Icons.star,
+                                    size: 14, color: Colors.black),
+                                const Icon(Icons.star,
+                                    size: 14, color: Colors.black),
+                                const Icon(Icons.star,
+                                    size: 14, color: Colors.black),
+                                const Icon(Icons.star,
+                                    size: 14, color: Colors.black),
+                                const Icon(Icons.star,
+                                    size: 14, color: Colors.black),
                                 Text(
                                   " (${clinic['reviews']})",
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
                                 ),
                               ],
                             ),
@@ -209,12 +247,14 @@ class LocationView extends StatelessWidget {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                                const Icon(Icons.location_on,
+                                    size: 14, color: Colors.grey),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
                                     clinic['address'],
-                                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 13),
                                   ),
                                 ),
                               ],
@@ -224,14 +264,17 @@ class LocationView extends StatelessWidget {
                             // Open Status
                             RichText(
                               text: TextSpan(
-                                style: const TextStyle(fontSize: 13, color: Colors.black),
+                                style: const TextStyle(
+                                    fontSize: 13, color: Colors.black),
                                 children: [
                                   TextSpan(
                                     text: AppTranslations.get('open'),
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
                                   TextSpan(
-                                    text: "${AppTranslations.get('until')} ${clinic['closing_time']}",
+                                    text:
+                                        "${AppTranslations.get('until')} ${clinic['closing_time']}",
                                     style: TextStyle(color: Colors.grey[600]),
                                   ),
                                 ],
@@ -244,6 +287,11 @@ class LocationView extends StatelessWidget {
                   },
                 ),
               ),
+
+              if (isOkuMode) ...[
+                const SizedBox(height: 10),
+                // Chat buttons removed per request
+              ],
             ],
           ),
         ),

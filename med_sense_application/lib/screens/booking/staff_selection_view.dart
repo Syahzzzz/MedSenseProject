@@ -3,9 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:med_sense_application/screens/chat/chat_screen.dart';
 import 'package:med_sense_application/utils/translations.dart';
+import 'package:med_sense_application/services/tts_manager.dart';
 
 class StaffSelectionView extends StatefulWidget {
-  const StaffSelectionView({super.key});
+  final bool isOkuMode;
+  
+  const StaffSelectionView({
+    super.key,
+    this.isOkuMode = false,
+  });
 
   @override
   State<StaffSelectionView> createState() => _StaffSelectionViewState();
@@ -13,13 +19,25 @@ class StaffSelectionView extends StatefulWidget {
 
 class _StaffSelectionViewState extends State<StaffSelectionView> {
   final _supabase = Supabase.instance.client;
+  final TtsManager _tts = TtsManager();
   bool _isLoading = true;
   List<Map<String, dynamic>> _staffList = [];
 
   @override
   void initState() {
     super.initState();
+    _tts.init();
+    if (widget.isOkuMode) {
+      _tts.setEnabled(true);
+      _tts.speak("Select a staff member to chat with");
+    }
     _fetchStaff();
+  }
+
+  void _speak(String text) {
+    if (widget.isOkuMode) {
+      _tts.speak(text);
+    }
   }
 
   Future<void> _fetchStaff() async {
@@ -153,21 +171,27 @@ class _StaffSelectionViewState extends State<StaffSelectionView> {
                           staff['name'],
                           style: TextStyle(
                             fontWeight: hasUnread ? FontWeight.w900 : FontWeight.bold,
-                            color: hasUnread ? Colors.black : Colors.black87
+                            color: hasUnread ? Colors.black : Colors.black87,
+                            fontSize: widget.isOkuMode ? 20 : 16,
                           ),
                         ),
                         subtitle: Text(
                           staff['role'] ?? 'Staff',
                           style: TextStyle(
                              fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
-                             color: hasUnread ? Colors.black87 : Colors.grey[600]
+                             color: hasUnread ? Colors.black87 : Colors.grey[600],
+                             fontSize: widget.isOkuMode ? 16 : 14,
                           ),
                         ),
                         trailing: Icon(
                           Icons.chat_bubble_outline, 
-                          color: hasUnread ? Colors.red : const Color(0xFFFBC02D)
+                          color: hasUnread ? Colors.red : const Color(0xFFFBC02D),
+                          size: widget.isOkuMode ? 32 : 24,
                         ),
                         onTap: () {
+                          if (widget.isOkuMode) {
+                            _speak("Chatting with ${staff['name']}");
+                          }
                           // Navigate to Chat Screen with specific staff ID
                           Navigator.push(
                             context,
@@ -176,6 +200,7 @@ class _StaffSelectionViewState extends State<StaffSelectionView> {
                                 isBot: false,
                                 receiverId: staff['staff_id'],
                                 receiverName: staff['name'],
+                                isOkuMode: widget.isOkuMode,
                               ),
                             ),
                           ).then((_) => _fetchStaff()); // Refresh state on return

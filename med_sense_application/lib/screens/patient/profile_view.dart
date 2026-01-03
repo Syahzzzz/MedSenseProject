@@ -11,7 +11,14 @@ import 'package:med_sense_application/screens/payment/add_card_view.dart';
 import 'package:med_sense_application/services/tts_manager.dart'; // Import TTS Manager
 
 class ProfileView extends StatefulWidget {
-  const ProfileView({super.key});
+  final VoidCallback? onBack;
+  final Function(bool)? onOkuChanged;
+
+  const ProfileView({
+    super.key, 
+    this.onBack,
+    this.onOkuChanged
+  });
 
   @override
   State<ProfileView> createState() => _ProfileViewState();
@@ -149,6 +156,11 @@ class _ProfileViewState extends State<ProfileView> {
     // Update TTS Manager state immediately
     _tts.setEnabled(value);
     _tts.speak(value ? "OKU Mode Enabled. Text to speech active." : "OKU Mode Disabled");
+
+    // Notify Parent
+    if (widget.onOkuChanged != null) {
+      widget.onOkuChanged!(value);
+    }
   }
 
   Future<void> _toggleQuickPin(bool value) async {
@@ -359,6 +371,20 @@ class _ProfileViewState extends State<ProfileView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.onBack != null) ...[
+              GestureDetector(
+                onTap: widget.onBack,
+                child: const Row(
+                  children: [
+                    Icon(Icons.arrow_back, size: 28, color: Colors.black),
+                    SizedBox(width: 10),
+                    Text("Back", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             GestureDetector(
               onTap: () => _speakText(AppTranslations.get('profile_title')),
               child: Text(

@@ -29,6 +29,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   String _userName = "User"; 
   String? _avatarUrl; 
   int _selectedIndex = 0; 
+  bool _isOkuEnabled = false; // OKU Mode State
 
   // Chat Expansion State
   bool _isChatExpanded = false;
@@ -60,6 +61,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+    _loadOkuSettings(); // Load OKU settings first
     _initializeNotifications();
     _registerBackgroundTask(); // Register Background Task
     _loadUserProfile();
@@ -77,6 +79,25 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestNotificationPermission();
+    });
+  }
+
+  Future<void> _loadOkuSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _isOkuEnabled = prefs.getBool('is_oku_enabled') ?? false;
+      });
+    }
+  }
+
+  void _onOkuChanged(bool enabled) {
+    setState(() {
+      _isOkuEnabled = enabled;
+      // If disabling OKU mode, ensure we are on a valid tab or home
+      // But we are likely in Profile view when this happens.
+      // If we are in Profile View (index 3), and we disable OKU, 
+      // Nav bar appears, we stay on Profile View. That's fine.
     });
   }
 
@@ -457,8 +478,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     // Base Travel Time by Location (Mock)
     int baseMinutes = 20; // Rawang (Closest)
-    if (clinicKey == 'dental_clinic_selayang') baseMinutes = 35;
-    if (clinicKey == 'dental_clinic_kl') baseMinutes = 60;
+    if (clinicKey == 'dental_clinic_selayang') {
+      baseMinutes = 35;
+    }
+    if (clinicKey == 'dental_clinic_kl') {
+      baseMinutes = 60;
+    }
 
     // Traffic Multiplier
     double multiplier = 1.0;
@@ -721,7 +746,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 // Navigate to Staff Selection
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const StaffSelectionView()),
+                  MaterialPageRoute(
+                    builder: (context) => StaffSelectionView(isOkuMode: _isOkuEnabled),
+                  ),
                 );
                 setState(() {
                    _isChatExpanded = false;
@@ -755,7 +782,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ChatScreen(isBot: true)),
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      isBot: true,
+                      isOkuMode: _isOkuEnabled,
+                    ),
+                  ),
                 );
                 setState(() => _isChatExpanded = false);
               },
@@ -806,7 +838,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         ],
       ),
 
-      bottomNavigationBar: CustomBottomNavigation(
+      bottomNavigationBar: _isOkuEnabled ? null : CustomBottomNavigation(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,
         backgroundColor: navBarColor,
@@ -816,11 +848,58 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   // --- Helper Widgets ---
 
+  Future<void> _openChatStaff() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StaffSelectionView(isOkuMode: _isOkuEnabled),
+      ),
+    );
+    setState(() {
+      _isChatExpanded = false;
+      _checkUnreadChat();
+    });
+  }
+
+  void _openChatBot() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          isBot: true,
+          isOkuMode: _isOkuEnabled,
+        ),
+      ),
+    );
+    setState(() => _isChatExpanded = false);
+  }
+
   Widget _getBody() {
-    if (_selectedIndex == 0) return _buildHome();
-    if (_selectedIndex == 1) return LocationView(onBack: () => setState(() => _selectedIndex = 0));
-    if (_selectedIndex == 2) return const ServicesView(); 
-    if (_selectedIndex == 3) return const ProfileView();
+    final VoidCallback? okuBackAction = _isOkuEnabled 
+      ? () => setState(() => _selectedIndex = 0)
+      : null;
+
+    if (_selectedIndex == 0) {
+      return _buildHome();
+    }
+    if (_selectedIndex == 1) {
+      return LocationView(
+          onBack: okuBackAction ?? () => setState(() => _selectedIndex = 0),
+          isOkuMode: _isOkuEnabled,
+          onChatStaff: _openChatStaff,
+          onChatBot: _openChatBot);
+    }
+    if (_selectedIndex == 2) {
+      return ServicesView(
+          onBack: okuBackAction,
+          isOkuMode: _isOkuEnabled,
+          onChatStaff: _openChatStaff,
+          onChatBot: _openChatBot);
+    }
+    if (_selectedIndex == 3) {
+      return ProfileView(
+          onBack: okuBackAction, onOkuChanged: _onOkuChanged);
+    }
     return Center(child: Text(AppTranslations.get('coming_soon')));
   }
 
@@ -853,18 +932,73 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               _buildGreeting(),
               const SizedBox(height: 15),
 
-              _buildQueueBanner(),
-              if (_queueData != null) const SizedBox(height: 20),
-              
-              _buildAppointmentBanner(),
-              const SizedBox(height: 30),
-              
-              _buildDoctorsSection(),
+              if (!_isOkuEnabled) ...[
+                _buildQueueBanner(),
+                if (_queueData != null) const SizedBox(height: 20),
+                
+                _buildAppointmentBanner(),
+                const SizedBox(height: 30),
+                
+                _buildDoctorsSection(),
+              ] else ...[
+                 // OKU MODE: Big Buttons
+                 const SizedBox(height: 10),
+                 if (_queueData != null) ...[
+                    _buildQueueBanner(),
+                    const SizedBox(height: 20),
+                 ],
+                 if (_upcomingAppointment != null) ...[
+                    _buildAppointmentBanner(),
+                    const SizedBox(height: 20),
+                 ],
+                 
+                 _buildBigButton("Booking", Icons.calendar_month, Colors.teal, () => setState(() => _selectedIndex = 2)),
+                 _buildBigButton("Profile", Icons.person, Colors.orange, () => setState(() => _selectedIndex = 3)),
+                 _buildBigButton("Location", Icons.location_on, Colors.blueAccent, () => setState(() => _selectedIndex = 1)),
+                 
+                 const SizedBox(height: 10),
+                 const Divider(thickness: 1.5, color: Colors.grey),
+                 const SizedBox(height: 10),
+
+                 // Chat Buttons (Added for OKU Mode Home)
+                 _buildBigButton(AppTranslations.get('chat_with_staff'), Icons.people, const Color(0xFF00796B), _openChatStaff),
+                 _buildBigButton(AppTranslations.get('chat_with_bot'), Icons.smart_toy, const Color(0xFF1565C0), _openChatBot),
+              ],
             ],
           ),
         ),
       ),
     ); 
+  }
+
+  Widget _buildBigButton(String title, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+             BoxShadow(
+              color: color.withValues(alpha: 0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: Colors.white),
+            const SizedBox(width: 15),
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildHeader() {

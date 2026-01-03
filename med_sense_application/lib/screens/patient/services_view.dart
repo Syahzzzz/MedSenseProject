@@ -5,7 +5,18 @@ import 'package:med_sense_application/screens/booking/booking_summary_view.dart'
 import 'package:med_sense_application/screens/patient/dashboard.dart';
 
 class ServicesView extends StatefulWidget {
-  const ServicesView({super.key});
+  final VoidCallback? onBack;
+  final bool isOkuMode;
+  final VoidCallback? onChatStaff;
+  final VoidCallback? onChatBot;
+
+  const ServicesView({
+    super.key, 
+    this.onBack,
+    this.isOkuMode = false,
+    this.onChatStaff,
+    this.onChatBot,
+  });
 
   @override
   State<ServicesView> createState() => _ServicesViewState();
@@ -97,12 +108,18 @@ class _ServicesViewState extends State<ServicesView> {
   }
 
   void _handleBack() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const DashboardPage()),
-      (route) => false, 
-    );
+    if (widget.onBack != null) {
+      widget.onBack!();
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardPage()),
+        (route) => false, 
+      );
+    }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -292,6 +309,9 @@ class _ServicesViewState extends State<ServicesView> {
                         },
                       ),
             ),
+             if (widget.isOkuMode) ...[
+                // Chat buttons removed per request
+             ],
           ],
         ),
       ),

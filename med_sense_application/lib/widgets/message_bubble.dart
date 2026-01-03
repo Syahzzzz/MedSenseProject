@@ -4,12 +4,14 @@ class MessageBubble extends StatelessWidget {
   final String text;
   final bool isUser;
   final String? time;
+  final double fontSize;
 
   const MessageBubble({
     super.key,
     required this.text,
     required this.isUser,
     this.time,
+    this.fontSize = 14.0,
   });
 
   @override
@@ -28,7 +30,10 @@ class MessageBubble extends StatelessWidget {
             ),
             child: Text(
               text,
-              style: TextStyle(color: isUser ? Colors.white : Colors.black),
+              style: TextStyle(
+                color: isUser ? Colors.white : Colors.black,
+                fontSize: fontSize,
+              ),
             ),
           ),
           if (time != null)

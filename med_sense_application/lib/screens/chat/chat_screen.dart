@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:med_sense_application/widgets/message_bubble.dart';
+import 'package:med_sense_application/services/tts_manager.dart';
 import 'dart:convert'; // Add this import for JSON encoding/decoding
 
 class ChatScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class ChatScreen extends StatefulWidget {
   final String? receiverName;
   final String senderType;    // 'patient' or 'staff'
   final String? customCurrentUserId; // Optional: Override the Auth ID (e.g., use Staff Table ID)
+  final bool isOkuMode;
 
   const ChatScreen({
     super.key, 
@@ -20,6 +22,7 @@ class ChatScreen extends StatefulWidget {
     this.receiverName,
     this.senderType = 'patient', // Default to patient
     this.customCurrentUserId,
+    this.isOkuMode = false,
   });
 
   @override
@@ -29,6 +32,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final _supabase = Supabase.instance.client;
+  final TtsManager _tts = TtsManager();
   
   // Bot variables
   final List<Map<String, dynamic>> _botMessages = [];
@@ -45,12 +49,25 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _tts.init();
+    if (widget.isOkuMode) {
+      _tts.setEnabled(true);
+      final title = widget.isBot ? 'Chat with Bot' : 'Chat with ${widget.receiverName ?? "Staff"}';
+      _tts.speak("$title. Type a message at the bottom.");
+    }
+    
     _currentUserId = _supabase.auth.currentUser?.id;
     _markChatAsRead();
     
     // Setup real-time if not bot
     if (!widget.isBot && _effectiveUserId.isNotEmpty && widget.receiverId != null) {
       _setupChat();
+    }
+  }
+
+  void _speak(String text) {
+    if (widget.isOkuMode) {
+      _tts.speak(text);
     }
   }
 
@@ -146,6 +163,11 @@ class _ChatScreenState extends State<ChatScreen> {
                    setState(() {
                       _messages.add(newMsg);
                    });
+                   
+                   // Speak incoming message if not from me
+                   if (widget.isOkuMode && sender != _effectiveUserId) {
+                      _speak("New message from ${widget.receiverName ?? "Staff"}: ${newMsg['message_content']}");
+                   }
                 }
              }
           },
@@ -196,13 +218,17 @@ class _ChatScreenState extends State<ChatScreen> {
       // Fallback for demo/prototype if API isn't running
       await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) {
+        final reply = "I received: \"$msg\". (Bot AI connection pending)";
         setState(() {
           _botMessages.add({
-            "text": "I received: \"$msg\". (Bot AI connection pending)", 
+            "text": reply, 
             "isUser": false,
             "time": _formatTime(DateTime.now())
           });
         });
+        if (widget.isOkuMode) {
+          _speak(reply);
+        }
       }
     } catch (e) {
       debugPrint("Bot error: $e");
@@ -318,10 +344,14 @@ class _ChatScreenState extends State<ChatScreen> {
       itemCount: _botMessages.length,
       itemBuilder: (context, index) {
         final msg = _botMessages[_botMessages.length - 1 - index];
-        return MessageBubble(
-          text: msg["text"],
-          isUser: msg["isUser"],
-          time: msg["time"],
+        return GestureDetector(
+          onTap: () => _speak(msg["text"]),
+          child: MessageBubble(
+            text: msg["text"],
+            isUser: msg["isUser"],
+            time: msg["time"],
+            fontSize: widget.isOkuMode ? 20.0 : 14.0,
+          ),
         );
       },
     );
@@ -355,10 +385,16 @@ class _ChatScreenState extends State<ChatScreen> {
       itemBuilder: (context, index) {
         final msg = displayMessages[index];
         final isMe = msg['sender_id'] == _effectiveUserId;
-        return MessageBubble(
-          text: msg['message_content'] ?? "", 
-          isUser: isMe,
-          time: _formatTime(msg['sent_at']),  
+        final content = msg['message_content'] ?? "";
+        
+        return GestureDetector(
+          onTap: () => _speak(content),
+          child: MessageBubble(
+            text: content, 
+            isUser: isMe,
+            time: _formatTime(msg['sent_at']),
+            fontSize: widget.isOkuMode ? 20.0 : 14.0,  
+          ),
         );
       },
     );
