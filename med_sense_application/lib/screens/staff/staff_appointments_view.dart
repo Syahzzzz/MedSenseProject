@@ -112,11 +112,14 @@ class _StaffAppointmentsViewState extends State<StaffAppointmentsView> with Sing
         try {
           final apt = _appointments.firstWhere((a) => a['appointment_id'] == appointmentId, orElse: () => {});
           final patientId = apt['patient_id'];
+          final serviceName = apt['Service']?['service_name'] ?? 'Appointment';
+          final dt = DateTime.parse(apt['appointment_datetime']).toLocal();
+          final dateStr = "${dt.day}/${dt.month}/${dt.year}";
           
           if (patientId != null) {
             await _supabase.from('Notification').insert({
               'recipient_id': patientId,
-              'message_content': 'Your appointment has been approved.',
+              'message_content': 'Your appointment for $serviceName on $dateStr has been approved.',
               'is_read': false,
             });
           }

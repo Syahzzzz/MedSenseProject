@@ -12,6 +12,7 @@ import 'package:med_sense_application/screens/booking/staff_selection_view.dart'
 import 'package:med_sense_application/screens/booking/booking_history_view.dart';
 import 'package:med_sense_application/screens/patient/notification_view.dart';
 import 'package:med_sense_application/services/notification_service.dart';
+import 'package:workmanager/workmanager.dart'; // Import Workmanager
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -58,6 +59,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   void initState() {
     super.initState();
     _initializeNotifications();
+    _registerBackgroundTask(); // Register Background Task
     _loadUserProfile();
     _fetchTopDoctors();
     _fetchUpcomingAppointment();
@@ -74,6 +76,19 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestNotificationPermission();
     });
+  }
+
+  void _registerBackgroundTask() {
+    // Unique name for the task
+    Workmanager().registerPeriodicTask(
+      "medsense_notification_check", 
+      "checkNotifications", 
+      frequency: const Duration(minutes: 15), // Minimum allowed on Android
+      constraints: Constraints(
+        networkType: NetworkType.connected, // Needs internet
+      ),
+      initialDelay: const Duration(seconds: 10), // Run shortly after app start for testing
+    );
   }
 
   @override

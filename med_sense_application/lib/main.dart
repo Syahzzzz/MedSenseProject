@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart'; // Import Workmanager
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Import Notifications
 import 'package:med_sense_application/utils/translations.dart'; // Import translations
 import 'package:med_sense_application/widgets/language_selector_widget.dart'; // Import language widget
 import 'package:med_sense_application/screens/auth/login.dart';
@@ -11,6 +13,90 @@ import 'package:med_sense_application/screens/auth/onboarding_view.dart';
 import 'package:med_sense_application/screens/auth/pin_login_view.dart'; // Import Pin Login
 import 'package:med_sense_application/screens/staff/staff_login_view.dart'; // Import Staff Login View
 
+// --- Background Task Callback ---
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    // 1. Initialize Dependencies for Background Isolate
+    await Supabase.initialize(
+      url: 'https://toqvutxnatkjxtpttjog.supabase.co',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcXZ1dHhuYXRranh0cHR0am9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0ODg1OTEsImV4cCI6MjA3OTA2NDU5MX0.D8bzPRlqXhPrc28fUFSw5GVPkPMwvRd-iUOECkrQbm0',
+    );
+    
+    final supabase = Supabase.instance.client;
+    final prefs = await SharedPreferences.getInstance();
+    
+    // 2. Initialize Notifications
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    try {
+      // 3. Get User ID (We need to store this in SharedPrefs when user logs in)
+      // Note: Supabase session might not persist easily across isolates without re-auth,
+      // but let's try to get a stored UID or rely on the session if persistent.
+      // A better way for background tasks is to store the user_id in SharedPreferences 
+      // when the user logs in the main app.
+      
+      final storedUid = prefs.getString('remember_me_uid');
+      // If we don't have a reliable UID, we can't check tailored notifications.
+      if (storedUid == null) {
+         return Future.value(true);
+      }
+
+      // 4. Check for Unread Notifications
+      // We look for notifications created in the last 20 minutes to avoid spamming old ones
+      final now = DateTime.now().toUtc();
+      final twentyMinsAgo = now.subtract(const Duration(minutes: 20)).toIso8601String();
+
+      final response = await supabase
+          .from('Notification')
+          .select()
+          .eq('recipient_id', storedUid)
+          .eq('is_read', false)
+          .gt('created_at', twentyMinsAgo) // Only recent ones
+          .order('created_at', ascending: false);
+
+      final List<dynamic> notifications = response as List<dynamic>;
+
+      if (notifications.isNotEmpty) {
+        // 5. Trigger Local Notification
+        for (var note in notifications) {
+          // Check if we already showed this notification (deduplication)
+          final noteId = note['notification_id'];
+          final wasShown = prefs.getBool('notified_$noteId') ?? false;
+          
+          if (!wasShown) {
+             await flutterLocalNotificationsPlugin.show(
+                noteId.hashCode, // Unique ID
+                'MedSense Update',
+                note['message_content'] ?? 'You have a new notification',
+                const NotificationDetails(
+                  android: AndroidNotificationDetails(
+                    'medsense_background_channel',
+                    'MedSense Background Updates',
+                    importance: Importance.max,
+                    priority: Priority.high,
+                  ),
+                ),
+             );
+             // Mark as shown locally so we don't repeat it next fetch
+             await prefs.setBool('notified_$noteId', true);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Background Task Error: $e");
+    }
+
+    return Future.value(true);
+  });
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -18,6 +104,12 @@ Future<void> main() async {
   await Supabase.initialize(
     url: 'https://toqvutxnatkjxtpttjog.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcXZ1dHhuYXRranh0cHR0am9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0ODg1OTEsImV4cCI6MjA3OTA2NDU5MX0.D8bzPRlqXhPrc28fUFSw5GVPkPMwvRd-iUOECkrQbm0',
+  );
+
+  // Initialize Workmanager
+  await Workmanager().initialize(
+    callbackDispatcher,
+    // isInDebugMode: false // Deprecated
   );
 
   runApp(const MyApp());
