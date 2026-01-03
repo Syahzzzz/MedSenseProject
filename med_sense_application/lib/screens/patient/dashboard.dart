@@ -14,6 +14,8 @@ import 'package:med_sense_application/screens/patient/notification_view.dart';
 import 'package:med_sense_application/services/notification_service.dart';
 import 'package:workmanager/workmanager.dart'; // Import Workmanager
 
+import 'package:med_sense_application/widgets/custom_bottom_navigation.dart';
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -804,30 +806,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         ],
       ),
 
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: navBarColor, 
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withValues(alpha: 0.1), 
-              blurRadius: 10
-            )
-          ]
-        ),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.transparent, 
-          elevation: 0, 
-          type: BottomNavigationBarType.fixed, 
-          selectedItemColor: Colors.black,
-          currentIndex: _selectedIndex, 
-          onTap: _onItemTapped,
-          items: [
-            BottomNavigationBarItem(icon: const Icon(Icons.home_outlined), label: AppTranslations.get('home')),
-            BottomNavigationBarItem(icon: const Icon(Icons.location_on_outlined), label: AppTranslations.get('location')),
-            BottomNavigationBarItem(icon: const Icon(Icons.calendar_today_outlined), label: AppTranslations.get('booking')),
-            BottomNavigationBarItem(icon: const Icon(Icons.person_outline), label: AppTranslations.get('profile')),
-          ],
-        ),
+      bottomNavigationBar: CustomBottomNavigation(
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
+        backgroundColor: navBarColor,
       ),
     );
   }
