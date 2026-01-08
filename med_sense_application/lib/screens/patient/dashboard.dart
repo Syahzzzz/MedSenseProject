@@ -12,6 +12,7 @@ import 'package:med_sense_application/screens/booking/staff_selection_view.dart'
 import 'package:med_sense_application/screens/booking/booking_history_view.dart';
 import 'package:med_sense_application/screens/patient/notification_view.dart';
 import 'package:med_sense_application/services/notification_service.dart';
+import 'package:med_sense_application/services/tts_manager.dart';
 import 'package:workmanager/workmanager.dart'; // Import Workmanager
 
 import 'package:med_sense_application/widgets/custom_bottom_navigation.dart';
@@ -26,6 +27,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> with SingleTickerProviderStateMixin {
   // --- State & Dependencies ---
   final _supabase = Supabase.instance.client;
+  final TtsManager _tts = TtsManager(); // TTS Manager
   String _userName = "User"; 
   String? _avatarUrl; 
   int _selectedIndex = 0; 
@@ -61,6 +63,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+    _tts.init(); // Initialize TTS
     _loadOkuSettings(); // Load OKU settings first
     _initializeNotifications();
     _registerBackgroundTask(); // Register Background Task
@@ -87,6 +90,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     if (mounted) {
       setState(() {
         _isOkuEnabled = prefs.getBool('is_oku_enabled') ?? false;
+        _tts.setEnabled(_isOkuEnabled); // Sync TTS state
       });
     }
   }
@@ -94,6 +98,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   void _onOkuChanged(bool enabled) {
     setState(() {
       _isOkuEnabled = enabled;
+      _tts.setEnabled(enabled); // Sync TTS state
       // If disabling OKU mode, ensure we are on a valid tab or home
       // But we are likely in Profile view when this happens.
       // If we are in Profile View (index 3), and we disable OKU, 
@@ -952,17 +957,13 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     const SizedBox(height: 20),
                  ],
                  
-                 _buildBigButton("Booking", Icons.calendar_month, Colors.teal, () => setState(() => _selectedIndex = 2)),
-                 _buildBigButton("Profile", Icons.person, Colors.orange, () => setState(() => _selectedIndex = 3)),
-                 _buildBigButton("Location", Icons.location_on, Colors.blueAccent, () => setState(() => _selectedIndex = 1)),
-                 
-                 const SizedBox(height: 10),
-                 const Divider(thickness: 1.5, color: Colors.grey),
-                 const SizedBox(height: 10),
+                 _buildBigButton("Booking", Icons.calendar_month, const Color(0xFF5E35B1), () => setState(() => _selectedIndex = 2)),
+                 _buildBigButton("Profile", Icons.person, const Color(0xFFD81B60), () => setState(() => _selectedIndex = 3)),
+                 _buildBigButton("Location", Icons.location_on, const Color(0xFF43A047), () => setState(() => _selectedIndex = 1)),
 
                  // Chat Buttons (Added for OKU Mode Home)
-                 _buildBigButton(AppTranslations.get('chat_with_staff'), Icons.people, const Color(0xFF00796B), _openChatStaff),
-                 _buildBigButton(AppTranslations.get('chat_with_bot'), Icons.smart_toy, const Color(0xFF1565C0), _openChatBot),
+                 _buildBigButton(AppTranslations.get('chat_with_staff'), Icons.people, const Color(0xFFFF8F00), _openChatStaff),
+                 _buildBigButton(AppTranslations.get('chat_with_bot'), Icons.smart_toy, const Color(0xFF1E88E5), _openChatBot),
               ],
             ],
           ),
@@ -973,7 +974,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   Widget _buildBigButton(String title, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        if (_isOkuEnabled) {
+          _tts.speak(title);
+        }
+        onTap();
+      },
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 24),

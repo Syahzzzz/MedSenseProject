@@ -8,12 +8,14 @@ class BookingDateTimeView extends StatefulWidget {
   final String serviceName;
   final String? servicePrice;
   final String description; // Added to pass breakdown details
+  final bool isOkuMode;
 
   const BookingDateTimeView({
     super.key,
     required this.serviceName,
     this.servicePrice,
     required this.description,
+    this.isOkuMode = false,
   });
 
   @override
@@ -382,6 +384,10 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isOkuMode) {
+      return _buildOkuUI(context);
+    }
+    
     final doctor = _assignedDoctor ?? {'name': 'Loading...', 'specialization': 'Loading...'};
     final Color primaryYellow = const Color(0xFFFBC02D);
     final selectedClinic = _clinics[_selectedClinicIndex];
@@ -683,6 +689,7 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                               time: _selectedTime!,
                               doctorName: doctor['name']!,
                               doctorId: doctor['doctor_id'],
+                              isOkuMode: widget.isOkuMode,
                             ),
                           ),
                         );
@@ -704,6 +711,218 @@ class _BookingDateTimeViewState extends State<BookingDateTimeView> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOkuUI(BuildContext context) {
+    final doctor = _assignedDoctor ?? {'name': 'Loading...', 'specialization': 'Loading...'};
+    final selectedClinic = _clinics[_selectedClinicIndex];
+    
+    // OKU Palette
+    const Color headerColor = Color(0xFF5E35B1); // Purple
+    const Color selectedTimeColor = Color(0xFF43A047); // Green
+    const Color buttonColor = Color(0xFFFF8F00); // Amber
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36, color: Colors.black),
+          onPressed: _handleBack,
+        ),
+        title: const Text(
+          "Select Time",
+          style: TextStyle(color: Colors.black, fontSize: 26, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Clinic & Doctor Card (Simplified)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE1F5FE), // Light Blue
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.blue, width: 2),
+                    ),
+                    child: Column(
+                      children: [
+                        Text("Doctor: ${doctor['name']}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        const Divider(thickness: 2),
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: _showLocationPicker,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.location_on, size: 30, color: Colors.red),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  AppTranslations.get(selectedClinic['nameKey']),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const Icon(Icons.edit, size: 24),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 2. Large Date Picker
+                  Text("1. Pick Date", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: headerColor)),
+                  const SizedBox(height: 10),
+                  Container(
+                     decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400, width: 2),
+                        borderRadius: BorderRadius.circular(16)
+                     ),
+                     child: CalendarDatePicker(
+                        initialDate: _selectedDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 90)),
+                        onDateChanged: (date) {
+                          setState(() {
+                            _selectedDate = date;
+                            _selectedTime = null;
+                          });
+                          _checkDateAvailability(date);
+                        },
+                      ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // 3. Huge Time Grid
+                  Text("2. Pick Time", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: headerColor)),
+                  const SizedBox(height: 15),
+                  
+                  Builder(
+                    builder: (context) {
+                       if (_checkingAvailability) {
+                         return const Center(child: CircularProgressIndicator());
+                       }
+                       if (_appointmentCountForDate >= 5) {
+                         return Container(
+                           padding: const EdgeInsets.all(20),
+                           color: Colors.red[100],
+                           child: const Text("FULLY BOOKED", style: TextStyle(fontSize: 20, color: Colors.red, fontWeight: FontWeight.bold)),
+                         );
+                       }
+
+                       // Filter slots
+                       final availableSlots = _timeSlots.where((time) => 
+                        _isTimeSlotAvailable(time) && !_bookedTimeSlots.contains(time)
+                       ).toList();
+
+                       if (availableSlots.isEmpty) {
+                         return const Text("No times available.", style: TextStyle(fontSize: 18));
+                       }
+
+                       return GridView.builder(
+                         shrinkWrap: true,
+                         physics: const NeverScrollableScrollPhysics(),
+                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                           crossAxisCount: 2,
+                           childAspectRatio: 2.5,
+                           crossAxisSpacing: 15,
+                           mainAxisSpacing: 15,
+                         ),
+                         itemCount: availableSlots.length,
+                         itemBuilder: (context, index) {
+                           final time = availableSlots[index];
+                           final isSelected = _selectedTime == time;
+                           
+                           return ElevatedButton(
+                             onPressed: () => setState(() => _selectedTime = time),
+                             style: ElevatedButton.styleFrom(
+                               backgroundColor: isSelected ? selectedTimeColor : Colors.white,
+                               foregroundColor: isSelected ? Colors.white : Colors.black,
+                               elevation: isSelected ? 4 : 1,
+                               shape: RoundedRectangleBorder(
+                                 borderRadius: BorderRadius.circular(15),
+                                 side: BorderSide(
+                                   color: isSelected ? Colors.transparent : Colors.grey.shade400,
+                                   width: 2
+                                 )
+                               ),
+                             ),
+                             child: Text(
+                               time, 
+                               style: TextStyle(
+                                 fontSize: 18, 
+                                 fontWeight: FontWeight.bold
+                               )
+                             ),
+                           );
+                         },
+                       );
+                    }
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+          
+          // Bottom Bar
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              border: const Border(top: BorderSide(color: Colors.grey)),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 65,
+              child: ElevatedButton(
+                onPressed: _selectedTime != null 
+                  ? () {
+                       Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ReviewConfirmView(
+                              clinicNameKey: selectedClinic['nameKey'],
+                              clinicAddress: selectedClinic['address'],
+                              serviceName: widget.serviceName,
+                              servicePrice: widget.servicePrice ?? "RM 0",
+                              description: widget.description,
+                              date: _selectedDate,
+                              time: _selectedTime!,
+                              doctorName: doctor['name']!,
+                              doctorId: doctor['doctor_id'],
+                              isOkuMode: true,
+                            ),
+                          ),
+                        );
+                    } 
+                  : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: buttonColor,
+                  foregroundColor: Colors.black,
+                  disabledBackgroundColor: Colors.grey[300],
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                child: const Text("CONFIRM", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               ),
             ),
           ),

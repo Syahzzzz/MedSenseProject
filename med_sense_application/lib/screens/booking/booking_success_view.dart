@@ -4,10 +4,12 @@ import 'package:med_sense_application/utils/translations.dart';
 
 class BookingSuccessView extends StatelessWidget {
   final Map<String, dynamic>? appointmentDetails;
+  final bool isOkuMode;
 
   const BookingSuccessView({
     super.key, 
     this.appointmentDetails,
+    this.isOkuMode = false,
   });
 
   // Color Constants matching the image
@@ -16,6 +18,10 @@ class BookingSuccessView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isOkuMode) {
+      return _buildOkuUI(context);
+    }
+    
     return Scaffold(
       backgroundColor: _yellowColor,
       body: SafeArea(
@@ -185,6 +191,89 @@ class BookingSuccessView extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildOkuUI(BuildContext context) {
+    // OKU Palette
+    const Color buttonColor = Color(0xFF43A047); // Green for Success/Action
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(),
+              // Huge Check Icon
+              Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  color: Colors.green[100],
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 100,
+                ),
+              ),
+              const SizedBox(height: 40),
+              
+              const Text(
+                "Booking Successful!",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                "We have received your appointment.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, color: Colors.grey[700]),
+              ),
+              
+              if (appointmentDetails != null) ...[
+                const SizedBox(height: 40),
+                Text(
+                  "${appointmentDetails!['date']} at ${appointmentDetails!['time']}",
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "Dr. ${appointmentDetails!['doctor_name']}",
+                  style: const TextStyle(fontSize: 22),
+                ),
+              ],
+              
+              const Spacer(),
+              
+              SizedBox(
+                width: double.infinity,
+                height: 80,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DashboardPage()),
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: buttonColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: const Text("BACK TO HOME", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

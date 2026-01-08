@@ -135,20 +135,37 @@ class _StaffSelectionViewState extends State<StaffSelectionView> {
                     final staff = _staffList[index];
                     final bool hasUnread = staff['has_unread'] ?? false;
                     
+                    // OKU Mode Styles
+                    final double avatarRadius = widget.isOkuMode ? 35 : 20;
+                    final double nameFontSize = widget.isOkuMode ? 24 : 16;
+                    final double roleFontSize = widget.isOkuMode ? 18 : 14;
+                    final double iconSize = widget.isOkuMode ? 40 : 24;
+                    final Color cardColor = widget.isOkuMode ? const Color(0xFFE3F2FD) : Colors.white;
+                    final Color borderColor = widget.isOkuMode ? Colors.blue : Colors.transparent;
+
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      margin: EdgeInsets.only(bottom: widget.isOkuMode ? 20 : 12),
+                      elevation: widget.isOkuMode ? 4 : 2,
+                      color: cardColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: borderColor, width: widget.isOkuMode ? 2 : 0),
+                      ),
                       child: ListTile(
-                        contentPadding: const EdgeInsets.all(12),
+                        contentPadding: EdgeInsets.all(widget.isOkuMode ? 20 : 12),
                         leading: Stack(
                           clipBehavior: Clip.none,
                           children: [
                             CircleAvatar(
+                              radius: avatarRadius,
                               backgroundColor: const Color(0xFFFFF9C4),
                               child: Text(
                                 (staff['name'] as String)[0],
-                                style: const TextStyle(color: Color(0xFFFBC02D), fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: const Color(0xFFFBC02D), 
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: widget.isOkuMode ? 24 : 16
+                                ),
                               ),
                             ),
                             if (hasUnread)
@@ -156,8 +173,8 @@ class _StaffSelectionViewState extends State<StaffSelectionView> {
                                 right: 0,
                                 top: 0,
                                 child: Container(
-                                  width: 12,
-                                  height: 12,
+                                  width: widget.isOkuMode ? 16 : 12,
+                                  height: widget.isOkuMode ? 16 : 12,
                                   decoration: const BoxDecoration(
                                     color: Colors.red,
                                     shape: BoxShape.circle,
@@ -172,21 +189,24 @@ class _StaffSelectionViewState extends State<StaffSelectionView> {
                           style: TextStyle(
                             fontWeight: hasUnread ? FontWeight.w900 : FontWeight.bold,
                             color: hasUnread ? Colors.black : Colors.black87,
-                            fontSize: widget.isOkuMode ? 20 : 16,
+                            fontSize: nameFontSize,
                           ),
                         ),
-                        subtitle: Text(
-                          staff['role'] ?? 'Staff',
-                          style: TextStyle(
-                             fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
-                             color: hasUnread ? Colors.black87 : Colors.grey[600],
-                             fontSize: widget.isOkuMode ? 16 : 14,
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            staff['role'] ?? 'Staff',
+                            style: TextStyle(
+                               fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+                               color: hasUnread ? Colors.black87 : Colors.grey[600],
+                               fontSize: roleFontSize,
+                            ),
                           ),
                         ),
                         trailing: Icon(
                           Icons.chat_bubble_outline, 
                           color: hasUnread ? Colors.red : const Color(0xFFFBC02D),
-                          size: widget.isOkuMode ? 32 : 24,
+                          size: iconSize,
                         ),
                         onTap: () {
                           if (widget.isOkuMode) {

@@ -15,6 +15,7 @@ class ReviewConfirmView extends StatefulWidget {
   final String time;
   final String doctorName; 
   final dynamic doctorId; // Added doctorId
+  final bool isOkuMode;
 
   const ReviewConfirmView({
     super.key,
@@ -27,6 +28,7 @@ class ReviewConfirmView extends StatefulWidget {
     required this.time,
     required this.doctorName, 
     required this.doctorId,
+    this.isOkuMode = false,
   });
 
   @override
@@ -75,7 +77,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
     
     if (_paymentMethod == onlineBankingLabel) {
        Navigator.push(
-         context, 
+         context,
          MaterialPageRoute(
            builder: (context) => OnlineBankingView(
              clinicNameKey: widget.clinicNameKey,
@@ -153,6 +155,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
               'time': widget.time,
               'price': widget.servicePrice,
             },
+            isOkuMode: widget.isOkuMode,
           )
         ),
       );
@@ -273,6 +276,10 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isOkuMode) {
+      return _buildOkuUI(context);
+    }
+    
     final String displayDate = "${widget.date.day}/${widget.date.month}/${widget.date.year}";
     
     // Use the passed service price directly
@@ -571,6 +578,124 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOkuUI(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Confirm & Pay",
+          style: TextStyle(color: Colors.black, fontSize: 26, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   // Summary Box
+                   Container(
+                     padding: const EdgeInsets.all(20),
+                     width: double.infinity,
+                     decoration: BoxDecoration(
+                        color: const Color(0xFFE1F5FE),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.blue, width: 2),
+                     ),
+                     child: Column(
+                       children: [
+                         Text(widget.serviceName, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                         const SizedBox(height: 10),
+                         Text(
+                           "${widget.date.day}/${widget.date.month}/${widget.date.year} at ${widget.time}", 
+                           textAlign: TextAlign.center, 
+                           style: const TextStyle(fontSize: 18, color: Colors.black87)
+                         ),
+                         const SizedBox(height: 10),
+                         Text("Dr. ${widget.doctorName}", textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, color: Colors.black54)),
+                         const SizedBox(height: 15),
+                         Text(widget.servicePrice, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF5E35B1))),
+                       ],
+                     ),
+                   ),
+
+                   const SizedBox(height: 30),
+
+                   // Payment Methods (Big Buttons)
+                   const Text("Select Payment Method:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                   const SizedBox(height: 15),
+                   
+                   _buildOkuPaymentOption(AppTranslations.get('pay_at_venue'), Icons.store),
+                   const SizedBox(height: 15),
+                   _buildOkuPaymentOption(AppTranslations.get('credit_debit'), Icons.credit_card),
+                   const SizedBox(height: 15),
+                   _buildOkuPaymentOption(AppTranslations.get('online_banking'), Icons.account_balance),
+                ],
+              ),
+            ),
+          ),
+          
+          Container(
+             padding: const EdgeInsets.all(20),
+             decoration: BoxDecoration(
+               color: Colors.grey[100],
+               border: const Border(top: BorderSide(color: Colors.grey)),
+             ),
+             child: SizedBox(
+                width: double.infinity,
+                height: 70,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _handleConfirm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF8F00), // Amber
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: _isLoading 
+                      ? const CircularProgressIndicator(color: Colors.black)
+                      : const Text("PAY & BOOK", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                ),
+             ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOkuPaymentOption(String label, IconData icon) {
+    final bool isSelected = _paymentMethod == label;
+    final Color color = isSelected ? const Color(0xFF43A047) : Colors.white; // Green if selected
+    final Color textColor = isSelected ? Colors.white : Colors.black;
+
+    return GestureDetector(
+      onTap: () => setState(() => _paymentMethod = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.grey.shade400, width: 2),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 30, color: textColor),
+            const SizedBox(width: 20),
+            Expanded(child: Text(label, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor))),
+            if (isSelected) const Icon(Icons.check_circle, color: Colors.white, size: 30),
+          ],
+        ),
       ),
     );
   }

@@ -121,8 +121,22 @@ class _ServicesViewState extends State<ServicesView> {
 
 
 
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'Braces': return const Color(0xFF5E35B1); // Purple
+      case 'Scaling': return const Color(0xFFD81B60); // Pink
+      case 'Whitening': return const Color(0xFF1E88E5); // Blue
+      case 'Retainers': return const Color(0xFF43A047); // Green
+      default: return const Color(0xFFFF8F00); // Amber
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.isOkuMode) {
+      return _buildOkuUI();
+    }
+    
     final Color primaryYellow = const Color(0xFFFBC02D);
     final Color chipColor = const Color(0xFFFFF59D);
 
@@ -309,9 +323,164 @@ class _ServicesViewState extends State<ServicesView> {
                         },
                       ),
             ),
-             if (widget.isOkuMode) ...[
-                // Chat buttons removed per request
-             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOkuUI() {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36, color: Colors.black),
+          onPressed: _handleBack,
+        ),
+        title: Text(
+          AppTranslations.get('services_title'),
+          style: const TextStyle(color: Colors.black, fontSize: 26, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: false,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Large Category Selector
+            Container(
+              height: 80,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: _categories.map((category) {
+                  final isSelected = _selectedCategory == category;
+                  final color = _getCategoryColor(category);
+                  
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedCategory = category),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isSelected ? color : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected ? Colors.transparent : color,
+                          width: 3
+                        ),
+                      ),
+                      child: Text(
+                        AppTranslations.get(category),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : color,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            // Large Service List
+            Expanded(
+              child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: Colors.blue, strokeWidth: 5))
+                : _servicesData[_selectedCategory]?.isEmpty ?? true
+                    ? Center(child: Text("No services", style: TextStyle(fontSize: 24, color: Colors.grey[600])))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _servicesData[_selectedCategory]?.length ?? 0,
+                        itemBuilder: (context, index) {
+                          final service = _servicesData[_selectedCategory]![index];
+                          final categoryColor = _getCategoryColor(_selectedCategory);
+                          
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.grey.shade300, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withValues(alpha: 0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        service['title']!,
+                                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black87),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        service['duration']!,
+                                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey[700]),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        service['price']!,
+                                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: categoryColor),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 60,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => BookingSummaryView(
+                                            serviceCategory: AppTranslations.get(_selectedCategory),
+                                            serviceTitle: service['title']!,
+                                            price: service['price']!,
+                                            duration: service['duration']!,
+                                            description: service['full_desc']!,
+                                            isOkuMode: true,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: categoryColor,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.only(
+                                          bottomLeft: Radius.circular(18),
+                                          bottomRight: Radius.circular(18),
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "BOOK NOW",
+                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                )
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+            ),
           ],
         ),
       ),

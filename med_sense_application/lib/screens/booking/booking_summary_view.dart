@@ -8,6 +8,7 @@ class BookingSummaryView extends StatelessWidget {
   final String price;           
   final String duration;        
   final String description; // Used for context or breakdown if present
+  final bool isOkuMode;
 
   const BookingSummaryView({
     super.key,
@@ -16,6 +17,7 @@ class BookingSummaryView extends StatelessWidget {
     required this.price,
     required this.duration,
     required this.description,
+    this.isOkuMode = false,
   });
 
   void _handleBack(BuildContext context) {
@@ -106,6 +108,10 @@ class BookingSummaryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isOkuMode) {
+      return _buildOkuUI(context);
+    }
+
     // Application Theme Yellow
     const Color backgroundColor = Color(0xFFFBC02D); 
     const Color cardColor = Colors.white; 
@@ -261,6 +267,7 @@ class BookingSummaryView extends StatelessWidget {
                                   serviceName: serviceTitle,
                                   servicePrice: price,
                                   description: description,
+                                  isOkuMode: isOkuMode,
                                 ),
                               ),
                             );
@@ -290,6 +297,114 @@ class BookingSummaryView extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOkuUI(BuildContext context) {
+    // OKU Palette
+    const Color primaryColor = Color(0xFF5E35B1); // Purple
+    const Color accentColor = Color(0xFFFF8F00); // Amber
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36, color: Colors.black),
+          onPressed: () => _handleBack(context),
+        ),
+        title: const Text(
+          "Review Booking",
+          style: TextStyle(color: Colors.black, fontSize: 26, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Summary Card
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE1F5FE), // Light Blue
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.blue, width: 2),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      serviceCategory,
+                      style: const TextStyle(fontSize: 22, color: Colors.black54, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      serviceTitle,
+                      style: const TextStyle(fontSize: 28, color: Colors.black, fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Price:", style: TextStyle(fontSize: 20)),
+                        Text(price, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: primaryColor)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Duration:", style: TextStyle(fontSize: 20)),
+                        Text(duration, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              const Spacer(),
+
+              SizedBox(
+                width: double.infinity,
+                height: 70,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BookingDateTimeView(
+                          serviceName: serviceTitle,
+                          servicePrice: price,
+                          description: description,
+                          isOkuMode: true,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: const Text(
+                    "CONFIRM & CONTINUE",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
