@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationView extends StatefulWidget {
   const NotificationView({super.key});
@@ -11,6 +12,7 @@ class NotificationView extends StatefulWidget {
 class _NotificationViewState extends State<NotificationView> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
+  bool _isOkuEnabled = false;
   List<Map<String, dynamic>> _notifications = [];
 
   // Theme Colors
@@ -20,7 +22,17 @@ class _NotificationViewState extends State<NotificationView> {
   @override
   void initState() {
     super.initState();
+    _loadOkuSettings();
     _fetchNotifications();
+  }
+
+  Future<void> _loadOkuSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _isOkuEnabled = prefs.getBool('is_oku_enabled') ?? false;
+      });
+    }
   }
 
   Future<void> _fetchNotifications() async {
@@ -97,10 +109,24 @@ class _NotificationViewState extends State<NotificationView> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Sizing for OKU
+    final double padding = _isOkuEnabled ? 24.0 : 16.0;
+    final double iconSize = _isOkuEnabled ? 32.0 : 20.0;
+    final double messageSize = _isOkuEnabled ? 20.0 : 14.0;
+    final double dateSize = _isOkuEnabled ? 16.0 : 12.0;
+    final double emptyIconSize = _isOkuEnabled ? 80.0 : 64.0;
+    final double emptyTextSize = _isOkuEnabled ? 22.0 : 16.0;
+
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text('Notifications', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('Notifications', 
+          style: TextStyle(
+            color: Colors.white, 
+            fontWeight: FontWeight.bold,
+            fontSize: _isOkuEnabled ? 24 : 20
+          )
+        ),
         backgroundColor: _primaryYellow,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -112,11 +138,11 @@ class _NotificationViewState extends State<NotificationView> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey[300]),
+                      Icon(Icons.notifications_off_outlined, size: emptyIconSize, color: Colors.grey[300]),
                       const SizedBox(height: 16),
                       Text(
                         'No notifications yet',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: emptyTextSize, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -143,7 +169,7 @@ class _NotificationViewState extends State<NotificationView> {
                       child: Card(
                         color: isRead ? Colors.white : Colors.yellow[50],
                         elevation: isRead ? 1 : 2,
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: EdgeInsets.only(bottom: _isOkuEnabled ? 16 : 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: InkWell(
                           onTap: () {
@@ -151,7 +177,7 @@ class _NotificationViewState extends State<NotificationView> {
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.all(padding),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -163,7 +189,7 @@ class _NotificationViewState extends State<NotificationView> {
                                   ),
                                   child: Icon(
                                     Icons.notifications,
-                                    size: 20,
+                                    size: iconSize,
                                     color: isRead ? Colors.grey : _primaryYellow,
                                   ),
                                 ),
@@ -175,7 +201,7 @@ class _NotificationViewState extends State<NotificationView> {
                                       Text(
                                         message,
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: messageSize,
                                           fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
                                           color: Colors.black87,
                                         ),
@@ -183,15 +209,15 @@ class _NotificationViewState extends State<NotificationView> {
                                       const SizedBox(height: 6),
                                       Text(
                                         date,
-                                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                                        style: TextStyle(fontSize: dateSize, color: Colors.grey[500]),
                                       ),
                                     ],
                                   ),
                                 ),
                                 if (!isRead)
                                   Container(
-                                    width: 10,
-                                    height: 10,
+                                    width: 12,
+                                    height: 12,
                                     decoration: BoxDecoration(
                                       color: Colors.redAccent,
                                       shape: BoxShape.circle,

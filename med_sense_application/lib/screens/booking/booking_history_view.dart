@@ -14,13 +14,24 @@ class BookingHistoryView extends StatefulWidget {
 class _BookingHistoryViewState extends State<BookingHistoryView> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
+  bool _isOkuEnabled = false; // Add OKU state
   List<Map<String, dynamic>> _bookings = [];
 
   @override
   void initState() {
     super.initState();
+    _loadOkuSettings(); // Load setting
     _clearNewBookingFlag();
     _fetchBookings();
+  }
+
+  Future<void> _loadOkuSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _isOkuEnabled = prefs.getBool('is_oku_enabled') ?? false;
+      });
+    }
   }
 
   Future<void> _clearNewBookingFlag() async {
@@ -100,16 +111,32 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.history, size: 64, color: Colors.grey),
+                      Icon(Icons.history, size: _isOkuEnabled ? 80 : 64, color: Colors.grey),
                       const SizedBox(height: 16),
                       Text(
                         'No past bookings found',
-                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: _isOkuEnabled ? 22 : 18, color: Colors.grey[600]),
                       ),
                     ],
                   ),
                 )
-              : _buildGroupedList(),
+              : _isOkuEnabled ? _buildFlatList() : _buildGroupedList(),
+    );
+  }
+
+  // --- OKU Mode: Flat List ---
+  Widget _buildFlatList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _bookings.length,
+      itemBuilder: (context, index) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: 20),
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: _buildBookingItem(_bookings[index]),
+        );
+      },
     );
   }
 
@@ -166,6 +193,7 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
     String paymentStatus = booking['payment_status'] as String? ?? 'Unpaid'; // Default to Unpaid
     String notes = booking['notes'] as String? ?? ''; // Get notes
     String paymentMethod = booking['payment_method'] as String? ?? '-';
+    final serviceName = service['service_name'] as String? ?? 'Service'; // Needed for flat list context
     
     // Price Logic: Use custom_price if available, else service price
     String priceDisplay = 'RM ${service['price'] ?? '0'}';
@@ -208,6 +236,14 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
       paymentColor = Colors.red;
     }
 
+    // --- Dynamic Sizing for OKU ---
+    final double dateSize = _isOkuEnabled ? 20 : 15;
+    final double titleSize = _isOkuEnabled ? 22 : 14; // Doctor/Service
+    final double textSize = _isOkuEnabled ? 18 : 13;
+    final double statusSize = _isOkuEnabled ? 14 : 10;
+    final double iconSize = _isOkuEnabled ? 28 : 16;
+    final double spacing = _isOkuEnabled ? 12 : 8;
+
     return InkWell(
       onTap: () async {
         await Navigator.push(
@@ -221,31 +257,40 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
       },
       child: Container(
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          border: _isOkuEnabled ? null : Border(top: BorderSide(color: Colors.grey.shade200)),
         ),
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(_isOkuEnabled ? 20 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_isOkuEnabled) ...[
+              // OKU Mode: Show Service Name prominently
+               Text(
+                 serviceName, 
+                 style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.bold, color: Colors.black)
+               ),
+               SizedBox(height: spacing),
+            ],
+
             Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
+                    Icon(Icons.calendar_today, size: iconSize, color: Colors.grey),
+                    SizedBox(width: spacing),
                     Flexible(
                       child: Text(
                         _formatDate(booking['appointment_datetime']),
-                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: dateSize), // Bolder/Larger date
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: spacing),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -258,35 +303,35 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
                   style: TextStyle(
                     color: statusColor,
                     fontWeight: FontWeight.bold,
-                    fontSize: 10,
+                    fontSize: statusSize,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: spacing),
           if (doctor.isNotEmpty)
             Row(
               children: [
-                const Icon(Icons.person, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
+                Icon(Icons.person, size: iconSize, color: Colors.grey),
+                SizedBox(width: spacing),
                 Text(
                   doctor['name'] ?? 'Unknown Doctor',
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  style: TextStyle(fontSize: titleSize, color: Colors.black87),
                 ),
               ],
             ),
-           const SizedBox(height: 4),
+           SizedBox(height: spacing / 2),
            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                  Row(
                    children: [
-                     const Icon(Icons.payments_outlined, size: 16, color: Colors.grey),
-                     const SizedBox(width: 8),
+                     Icon(Icons.payments_outlined, size: iconSize, color: Colors.grey),
+                     SizedBox(width: spacing),
                      Text(
                       priceDisplay,
-                      style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                      style: TextStyle(color: Colors.grey[700], fontSize: textSize, fontWeight: FontWeight.w500),
                      ),
                    ],
                  ),
@@ -296,27 +341,27 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
                    style: TextStyle(
                      color: paymentColor,
                      fontWeight: FontWeight.bold,
-                     fontSize: 12,
+                     fontSize: statusSize + 2,
                    ),
                  ),
               ],
            ),
-           const SizedBox(height: 4),
+           SizedBox(height: spacing / 2),
            Row(
              children: [
-               const Icon(Icons.payment, size: 16, color: Colors.grey),
-               const SizedBox(width: 8),
+               Icon(Icons.payment, size: iconSize, color: Colors.grey),
+               SizedBox(width: spacing),
                Expanded(
                  child: Text(
                    paymentMethod,
-                   style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                   style: TextStyle(color: Colors.grey[700], fontSize: textSize),
                    overflow: TextOverflow.ellipsis,
                  ),
                ),
              ],
            ),
            if (notes.isNotEmpty) ...[
-             const SizedBox(height: 8),
+             SizedBox(height: spacing),
              Container(
                width: double.infinity,
                padding: const EdgeInsets.all(8),
@@ -330,19 +375,19 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
                  children: [
                    Text(
                      "Note from clinic:", 
-                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange[800])
+                     style: TextStyle(fontSize: statusSize, fontWeight: FontWeight.bold, color: Colors.orange[800])
                    ),
                    const SizedBox(height: 2),
                    Text(
                      notes,
-                     style: TextStyle(fontSize: 12, color: Colors.grey[800], fontStyle: FontStyle.italic),
+                     style: TextStyle(fontSize: textSize, color: Colors.grey[800], fontStyle: FontStyle.italic),
                    ),
                  ],
                ),
              ),
            ],
-           // Timeline View
-           _buildTimelineWidget(booking),
+           // Timeline View (Hide in OKU Mode to simplify?)
+           if (!_isOkuEnabled) _buildTimelineWidget(booking),
         ],
       ),
     ));

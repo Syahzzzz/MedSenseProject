@@ -80,9 +80,24 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       duration: const Duration(milliseconds: 250),
     );
 
+    // Listen for language changes
+    appLanguageNotifier.addListener(_onLanguageChanged);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestNotificationPermission();
     });
+  }
+
+  @override
+  void dispose() {
+    appLanguageNotifier.removeListener(_onLanguageChanged);
+    _notificationChannel?.unsubscribe();
+    _chatAnimationController.dispose();
+    super.dispose();
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadOkuSettings() async {
@@ -99,10 +114,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     setState(() {
       _isOkuEnabled = enabled;
       _tts.setEnabled(enabled); // Sync TTS state
-      // If disabling OKU mode, ensure we are on a valid tab or home
-      // But we are likely in Profile view when this happens.
-      // If we are in Profile View (index 3), and we disable OKU, 
-      // Nav bar appears, we stay on Profile View. That's fine.
     });
   }
 
@@ -117,13 +128,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       ),
       initialDelay: const Duration(seconds: 10), // Run shortly after app start for testing
     );
-  }
-
-  @override
-  void dispose() {
-    _notificationChannel?.unsubscribe();
-    _chatAnimationController.dispose();
-    super.dispose();
   }
 
   Future<void> _initializeNotifications() async {
@@ -730,15 +734,23 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final Color navBarColor = const Color(0xFFFFF9C4);
     final Color primaryYellow = const Color(0xFFFBC02D);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: _getBody(),
-      ),
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (didPop) return;
+        setState(() {
+          _selectedIndex = 0;
+        });
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _getBody(),
+        ),
 
-      // --- Expandable Chat FAB ---
+        // --- Expandable Chat FAB ---
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -848,7 +860,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         onItemTapped: _onItemTapped,
         backgroundColor: navBarColor,
       ),
-    );
+    ));
   }
 
   // --- Helper Widgets ---
@@ -958,11 +970,19 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                  ],
                  
                  _buildBigButton("Booking", Icons.calendar_month, const Color(0xFF5E35B1), () => setState(() => _selectedIndex = 2)),
+                 _buildBigButton("Booking History", Icons.history, const Color(0xFF00ACC1), () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingHistoryView()));
+                    _checkBookingNotification();
+                 }, hasUpdate: _hasNewBooking),
+                 _buildBigButton("Notifications", Icons.notifications, const Color(0xFF3949AB), () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationView()));
+                    _fetchUnreadNotificationsCount();
+                 }, hasUpdate: _unreadNotificationsCount > 0),
                  _buildBigButton("Profile", Icons.person, const Color(0xFFD81B60), () => setState(() => _selectedIndex = 3)),
                  _buildBigButton("Location", Icons.location_on, const Color(0xFF43A047), () => setState(() => _selectedIndex = 1)),
 
                  // Chat Buttons (Added for OKU Mode Home)
-                 _buildBigButton(AppTranslations.get('chat_with_staff'), Icons.people, const Color(0xFFFF8F00), _openChatStaff),
+                 _buildBigButton(AppTranslations.get('chat_with_staff'), Icons.people, const Color(0xFFFF8F00), _openChatStaff, hasUpdate: _hasUnreadChat),
                  _buildBigButton(AppTranslations.get('chat_with_bot'), Icons.smart_toy, const Color(0xFF1E88E5), _openChatBot),
               ],
             ],
@@ -972,7 +992,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     ); 
   }
 
-  Widget _buildBigButton(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildBigButton(String title, IconData icon, Color color, VoidCallback onTap, {bool hasUpdate = false}) {
     return GestureDetector(
       onTap: () {
         if (_isOkuEnabled) {
@@ -987,6 +1007,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(24),
+          border: hasUpdate ? Border.all(color: Colors.red, width: 4.0) : null,
           boxShadow: [
              BoxShadow(
               color: color.withValues(alpha: 0.4),
@@ -1206,19 +1227,29 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     }
 
     // --- Prediction Logic ---
-    // 1. Est Wait Time (Queue)
-    // Assume 15 mins per person ahead
-    // If Status is Serving, wait time is 0 (or almost 0)
-    int estWaitMinutes = _peopleAhead * 15;
-    if (estWaitMinutes == 0 && status == 'Waiting') estWaitMinutes = 5; // Min wait
-    if (status == 'Serving') estWaitMinutes = 0;
-
-    // 2. Times
     final now = DateTime.now();
-    final estServiceTime = now.add(Duration(minutes: estWaitMinutes));
+    DateTime estServiceTime;
+
+    // Check for Appointment Time
+    final appointment = _queueData!['Appointment'] as Map<String, dynamic>?;
+    DateTime? appointmentTime;
+    if (appointment != null && appointment['appointment_datetime'] != null) {
+      appointmentTime = DateTime.parse(appointment['appointment_datetime']).toLocal();
+    }
+
+    if (appointmentTime != null && appointmentTime.isAfter(now)) {
+       // Primary: Base on Appointment Time if it's in the future
+       estServiceTime = appointmentTime;
+    } else {
+       // Fallback: Queue-based (Walk-in or Late/Current)
+       int estWaitMinutes = _peopleAhead * 15;
+       if (estWaitMinutes == 0 && status == 'Waiting') estWaitMinutes = 5;
+       if (status == 'Serving') estWaitMinutes = 0;
+       estServiceTime = now.add(Duration(minutes: estWaitMinutes));
+    }
     
-    // Target Arrival: 10 mins before service
-    final targetArrival = estServiceTime.subtract(const Duration(minutes: 10));
+    // Target Arrival: 30 mins before service to be safe
+    final targetArrival = estServiceTime.subtract(const Duration(minutes: 30));
     
     // Time to Leave: Target Arrival - Travel Time
     final timeToLeave = targetArrival.subtract(Duration(minutes: _travelTimeMinutes));

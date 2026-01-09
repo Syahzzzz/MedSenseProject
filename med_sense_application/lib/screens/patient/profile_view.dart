@@ -44,6 +44,18 @@ class _ProfileViewState extends State<ProfileView> {
     _tts.init(); // Initialize TTS engine
     _loadUserProfile();
     _loadLocalSettings(); 
+    // Listen for language changes to rebuild UI immediately
+    appLanguageNotifier.addListener(_onLanguageChanged);
+  }
+
+  @override
+  void dispose() {
+    appLanguageNotifier.removeListener(_onLanguageChanged);
+    super.dispose();
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) setState(() {});
   }
 
   // --- Data Loading ---
@@ -365,6 +377,14 @@ class _ProfileViewState extends State<ProfileView> {
   // --- UI Building ---
   @override
   Widget build(BuildContext context) {
+    // Dynamic Sizing for OKU
+    final double titleSize = _isOkuEnabled ? 32.0 : 28.0;
+    final double nameSize = _isOkuEnabled ? 24.0 : 20.0;
+    final double emailSize = _isOkuEnabled ? 16.0 : 14.0;
+    final double menuTitleSize = _isOkuEnabled ? 20.0 : 16.0; // Implicit default was body text
+    final double menuIconSize = _isOkuEnabled ? 32.0 : 24.0;
+    final double padding = _isOkuEnabled ? 16.0 : 0.0;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
@@ -374,11 +394,11 @@ class _ProfileViewState extends State<ProfileView> {
             if (widget.onBack != null) ...[
               GestureDetector(
                 onTap: widget.onBack,
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.arrow_back, size: 28, color: Colors.black),
-                    SizedBox(width: 10),
-                    Text("Back", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+                    Icon(Icons.arrow_back, size: _isOkuEnabled ? 36 : 28, color: Colors.black),
+                    const SizedBox(width: 10),
+                    Text("Back", style: TextStyle(fontSize: _isOkuEnabled ? 20 : 16, fontWeight: FontWeight.bold))
                   ],
                 ),
               ),
@@ -389,7 +409,7 @@ class _ProfileViewState extends State<ProfileView> {
               onTap: () => _speakText(AppTranslations.get('profile_title')),
               child: Text(
                 AppTranslations.get('profile_title'),
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 30),
@@ -401,13 +421,13 @@ class _ProfileViewState extends State<ProfileView> {
                 child: Column(
                   children: [
                     CircleAvatar(
-                      radius: 50,
+                      radius: _isOkuEnabled ? 60 : 50,
                       backgroundColor: const Color(0xFFFBC02D),
                       backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
                           ? NetworkImage(_avatarUrl!)
                           : null,
                       child: _avatarUrl == null || _avatarUrl!.isEmpty
-                          ? const Icon(Icons.person, size: 50, color: Colors.white)
+                          ? Icon(Icons.person, size: _isOkuEnabled ? 60 : 50, color: Colors.white)
                           : null,
                     ),
                     const SizedBox(height: 15),
@@ -415,22 +435,22 @@ class _ProfileViewState extends State<ProfileView> {
                     Text(
                       _userName,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: nameSize, fontWeight: FontWeight.bold),
                     ),
                     
                     Text(
                       _email,
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: emailSize, color: Colors.grey[600]),
                     ),
                     
                     const SizedBox(height: 12),
                     // Patient ID Canvas
                     SizedBox(
-                      width: 200, 
-                      height: 36,
+                      width: _isOkuEnabled ? 240 : 200, 
+                      height: _isOkuEnabled ? 44 : 36,
                       child: CustomPaint(
-                        painter: PatientIdPainter(patientId: _patientId),
+                        painter: PatientIdPainter(patientId: _patientId, isOku: _isOkuEnabled),
                       ),
                     ),
                   ],
@@ -443,6 +463,9 @@ class _ProfileViewState extends State<ProfileView> {
             _buildMenuTile(
               icon: Icons.person_outline,
               title: AppTranslations.get('personal_info'),
+              fontSize: menuTitleSize,
+              iconSize: menuIconSize,
+              padding: padding,
               onTap: () async {
                 _speakText("Opening Personal Information");
                 await Navigator.push(
@@ -456,6 +479,9 @@ class _ProfileViewState extends State<ProfileView> {
             _buildMenuTile(
               icon: Icons.lock_outline,
               title: AppTranslations.get('security'),
+              fontSize: menuTitleSize,
+              iconSize: menuIconSize,
+              padding: padding,
               onTap: () {
                 _speakText("Opening Security Settings");
                 Navigator.push(
@@ -469,6 +495,9 @@ class _ProfileViewState extends State<ProfileView> {
             _buildMenuTile(
               icon: Icons.payment,
               title: AppTranslations.get('payment_methods'),
+              fontSize: menuTitleSize,
+              iconSize: menuIconSize,
+              padding: padding,
               onTap: () {
                 _speakText("Opening Payment Methods");
                 Navigator.push(
@@ -482,18 +511,18 @@ class _ProfileViewState extends State<ProfileView> {
 
             // --- OKU Toggle ---
             SwitchListTile(
-              contentPadding: EdgeInsets.zero,
+              contentPadding: EdgeInsets.symmetric(vertical: padding / 2),
               activeTrackColor: const Color(0xFFFBC02D),
               title: GestureDetector(
                 onTap: () => _speakText("OKU Feature. Toggle to enable accessibility features."),
                 child: Text(
                   AppTranslations.get('oku_feature'),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: menuTitleSize),
                 ),
               ),
               subtitle: Text(
                 "Enable accessibility features",
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(fontSize: emailSize, color: Colors.grey[600]),
               ),
               value: _isOkuEnabled,
               onChanged: _toggleOku,
@@ -501,31 +530,31 @@ class _ProfileViewState extends State<ProfileView> {
 
             // --- Quick PIN Toggle (New) ---
             SwitchListTile(
-              contentPadding: EdgeInsets.zero,
+              contentPadding: EdgeInsets.symmetric(vertical: padding / 2),
               activeTrackColor: const Color(0xFFFBC02D),
               title: GestureDetector(
                 onTap: () => _speakText("Quick PIN. Toggle to enable quick login with PIN."),
                 child: Text(
                   AppTranslations.get('tab_pin'), 
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: menuTitleSize),
                 ),
               ),
               subtitle: Text(
                 "Enable quick login with PIN",
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(fontSize: emailSize, color: Colors.grey[600]),
               ),
               value: _isQuickPinEnabled,
               onChanged: _toggleQuickPin,
             ),
 
             SwitchListTile(
-              contentPadding: EdgeInsets.zero,
+              contentPadding: EdgeInsets.symmetric(vertical: padding / 2),
               activeTrackColor: const Color(0xFFFBC02D),
               title: GestureDetector(
                 onTap: () => _speakText("Notifications. Toggle to receive updates."),
                 child: Text(
                   AppTranslations.get('notifications'),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: menuTitleSize),
                 ),
               ),
               value: _notificationsEnabled,
@@ -539,7 +568,7 @@ class _ProfileViewState extends State<ProfileView> {
             // Logout Button with Confirmation
             SizedBox(
               width: double.infinity,
-              height: 55,
+              height: _isOkuEnabled ? 65 : 55,
               child: ElevatedButton(
                 onPressed: _showLogoutConfirmation, 
                 style: ElevatedButton.styleFrom(
@@ -551,11 +580,11 @@ class _ProfileViewState extends State<ProfileView> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.logout),
+                    Icon(Icons.logout, size: _isOkuEnabled ? 30 : 24),
                     const SizedBox(width: 10),
                     Text(
                       AppTranslations.get('logout'),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: menuTitleSize, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -571,7 +600,7 @@ class _ProfileViewState extends State<ProfileView> {
                   style: TextStyle(
                     color: Colors.grey[600],
                     decoration: TextDecoration.underline,
-                    fontSize: 14,
+                    fontSize: _isOkuEnabled ? 18 : 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -601,20 +630,26 @@ class _ProfileViewState extends State<ProfileView> {
     required IconData icon,
     required String title,
     required VoidCallback onTap,
+    double fontSize = 16.0,
+    double iconSize = 24.0,
+    double padding = 0.0,
   }) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF9C4),
-          borderRadius: BorderRadius.circular(10),
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: padding / 2),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Container(
+          padding: EdgeInsets.all(_isOkuEnabled ? 14 : 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF9C4),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.black87, size: iconSize),
         ),
-        child: Icon(icon, color: Colors.black87),
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: fontSize)),
+        trailing: Icon(Icons.arrow_forward_ios, size: _isOkuEnabled ? 24 : 16, color: Colors.grey),
+        onTap: onTap,
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      onTap: onTap,
     );
   }
 }
@@ -623,11 +658,13 @@ class PatientIdPainter extends CustomPainter {
   final String patientId;
   final Color backgroundColor;
   final Color borderColor;
+  final bool isOku;
 
   PatientIdPainter({
     required this.patientId,
     this.backgroundColor = const Color(0xFFFFF9C4), 
-    this.borderColor = const Color(0xFFFBC02D),     
+    this.borderColor = const Color(0xFFFBC02D),
+    this.isOku = false,
   });
 
   @override
@@ -651,14 +688,15 @@ class PatientIdPainter extends CustomPainter {
 
     final textSpan = TextSpan(
       text: "ID : $patientId",
-      style: const TextStyle(
+      style: TextStyle(
         color: Colors.black87,
-        fontSize: 14,
+        fontSize: isOku ? 18 : 14,
         fontWeight: FontWeight.bold,
         letterSpacing: 1.2,
       ),
     );
-
+    
+    // ... remainder of painter code implies re-layout ...
     final textPainter = TextPainter(
       text: textSpan,
       textDirection: TextDirection.ltr,
@@ -677,6 +715,6 @@ class PatientIdPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PatientIdPainter oldDelegate) {
-    return oldDelegate.patientId != patientId;
+    return oldDelegate.patientId != patientId || oldDelegate.isOku != isOku;
   }
 }
