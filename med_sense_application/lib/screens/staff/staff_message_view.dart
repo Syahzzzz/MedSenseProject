@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:med_sense_application/screens/chat/chat_screen.dart';
+import 'package:med_sense_application/screens/staff/patient_selection_view.dart';
 import 'dart:convert';
 
 class StaffMessagesView extends StatefulWidget {
@@ -210,6 +211,24 @@ class _StaffMessagesViewState extends State<StaffMessagesView> {
             },
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (_resolvedStaffId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PatientSelectionView(staffId: _resolvedStaffId!),
+              ),
+            ).then((_) => _fetchConversations());
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Staff ID not resolved. Please try again.')),
+            );
+          }
+        },
+        backgroundColor: Colors.blueGrey.shade800,
+        child: const Icon(Icons.message, color: Colors.white),
       ),
       body: Column(
         children: [
