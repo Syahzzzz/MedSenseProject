@@ -918,20 +918,30 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final title = widget.isBot ? 'BotSense 🦷' : (widget.receiverName ?? 'Chat');
-    final primaryColor =
-        widget.isBot ? const Color(0xFF2196F3) : const Color(0xFFFBC02D);
-    final textColor = widget.isBot ? Colors.white : Colors.black;
-    final appBarColor = widget.isBot ? const Color(0xFF2196F3) : Colors.white;
+    final isBot = widget.isBot;
+
+    // Theme Logic - White Futuristic
+    final backgroundColor = isBot ? Colors.white : const Color(0xFFF5F9FF);
+    final appBarColor = isBot ? Colors.white : (widget.isBot ? const Color(0xFF2196F3) : Colors.white);
+    final textColor = isBot ? Colors.black87 : (widget.isBot ? Colors.white : Colors.black);
+    final inputBtnColor = isBot ? Colors.cyan : (widget.isBot ? const Color(0xFF2196F3) : const Color(0xFFFBC02D));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9FF),
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         title: Text(
           title,
-          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: textColor, 
+            fontWeight: FontWeight.bold,
+            fontFamily: isBot ? 'Courier' : null,
+          ),
         ),
         backgroundColor: appBarColor,
         elevation: 0,
+        shape: isBot 
+            ? const Border(bottom: BorderSide(color: Colors.cyan, width: 1)) 
+            : null,
         iconTheme: IconThemeData(color: textColor),
       ),
       body: Column(
@@ -939,7 +949,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: widget.isBot ? _buildBotList() : _buildHumanList(),
           ),
-          _buildInputArea(primaryColor),
+          _buildInputArea(inputBtnColor),
         ],
       ),
     );
@@ -951,12 +961,16 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.smart_toy, size: 64, color: Colors.grey[400]),
+            Icon(Icons.smart_toy, size: 64, color: Colors.cyan.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               "Ask me about queue status,\nOKU priority, or dental care tips.",
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16, 
+                color: Colors.black54,
+                fontFamily: 'Courier',
+              ),
             ),
           ],
         ),
@@ -975,6 +989,7 @@ class _ChatScreenState extends State<ChatScreen> {
             isUser: msg["isUser"],
             time: msg["time"],
             fontSize: widget.isOkuMode ? 20.0 : 14.0,
+            isBotChat: true,
           ),
         );
       },
@@ -1024,6 +1039,61 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputArea(Color btnColor) {
+    if (widget.isBot) {
+      // Futuristic Bot Input Area (White Theme)
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Colors.cyan, width: 1)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                style: const TextStyle(color: Colors.black87, fontFamily: 'Courier'),
+                cursorColor: Colors.cyan,
+                decoration: InputDecoration(
+                  hintText: 'Type a command...',
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  filled: true,
+                  fillColor: const Color(0xFFFAFAFA),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: Colors.cyan.withValues(alpha: 0.5)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(color: Colors.cyan),
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                onSubmitted: (_) => _sendMessage(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: Colors.cyan.withValues(alpha: 0.4), blurRadius: 8)
+                ]
+              ),
+              child: FloatingActionButton(
+                mini: true,
+                onPressed: _sendMessage,
+                backgroundColor: Colors.white,
+                shape: const CircleBorder(side: BorderSide(color: Colors.cyan)),
+                child: const Icon(Icons.send, color: Colors.cyan),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: const BoxDecoration(
