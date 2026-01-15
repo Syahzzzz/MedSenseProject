@@ -104,7 +104,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     _speak(
-      "Greetings! This is your medical assistant speaking. You can ask about appointments, queue status, or support.",
+      "Greetings! This is your kawaii medical assistant speaking. You can ask about appointments, queue status, or support.",
     );
   }
 
@@ -180,8 +180,9 @@ class _ChatScreenState extends State<ChatScreen> {
             final sender = newMsg['sender_id'];
             final recipient = newMsg['recipient_id'];
 
-            bool isRelevant = (sender == _effectiveUserId && recipient == widget.receiverId) ||
-                (sender == widget.receiverId && recipient == _effectiveUserId);
+            bool isRelevant =
+                (sender == _effectiveUserId && recipient == widget.receiverId) ||
+                    (sender == widget.receiverId && recipient == _effectiveUserId);
 
             if (isRelevant && mounted) {
               final exists =
@@ -228,8 +229,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final day = dt.day.toString().padLeft(2, '0');
       const monthNames = [
-        "Jan", "Feb", "Mac", "Apr", "Mei", "Jun",
-        "Jul", "Ogos", "Sep", "Okt", "Nov", "Dis"
+        "Jan",
+        "Feb",
+        "Mac",
+        "Apr",
+        "Mei",
+        "Jun",
+        "Jul",
+        "Ogos",
+        "Sep",
+        "Okt",
+        "Nov",
+        "Dis"
       ];
       final monthName = monthNames[dt.month - 1];
       final year = dt.year.toString();
@@ -249,7 +260,43 @@ class _ChatScreenState extends State<ChatScreen> {
     return Supabase.instance.client.auth.currentUser?.id;
   }
 
-   Future<void> _handleAppointmentsIntent() async {
+  Future<DateTime?> _pickDateTime(BuildContext context) async {
+    final now = DateTime.now();
+
+    final DateTime? date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: DateTime(now.year + 1),
+    );
+
+    if (date == null) return null;
+
+    final TimeOfDay? time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now),
+    );
+
+    if (time == null) return null;
+
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+  }
+
+  bool _isWithinWorkingHours(DateTime dt) {
+    // 9:00 – 21:30 daily (Malaysia clinic hours)
+    final startMinutes = 9 * 60;
+    final endMinutes = 21 * 60 + 30;
+    final m = dt.hour * 60 + dt.minute;
+    return m >= startMinutes && m <= endMinutes;
+  }
+
+  Future<void> _handleAppointmentsIntent() async {
     final patientId = await _getPatientId();
     if (patientId == null) {
       setState(() {
@@ -290,21 +337,21 @@ class _ChatScreenState extends State<ChatScreen> {
         final buffer = StringBuffer();
         buffer.writeln("Here are your upcoming appointments:\n");
 
-    for (var item in data.take(3)) {
-      final status = (item['status']?.toString() ?? 'Unknown');
-      if (status.toLowerCase() == 'cancelled' ||
-          status.toLowerCase() == 'completed') {
-        continue; // skip non-active appointments
-      }
+        for (var item in data.take(3)) {
+          final status = (item['status']?.toString() ?? 'Unknown');
+          if (status.toLowerCase() == 'cancelled' ||
+              status.toLowerCase() == 'completed' ||
+              status.toLowerCase() == 'expired') {
+            continue;
+          }
 
           final rawDt = item['appointment_datetime']?.toString() ?? '';
           final dt = _formatAppointmentDate(rawDt);
 
           buffer.writeln("• Date & time: $dt");
-          buffer.writeln("  Status     : $status");
+          buffer.writeln("  Status      : $status");
           buffer.writeln("");
         }
-
 
         if (data.length > 3) {
           buffer.writeln(
@@ -335,6 +382,90 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _botMessages.add({
           "text": "Oops! The server went for a coffee break.",
+          "isUser": false,
+          "time": _formatTime(DateTime.now()),
+        });
+      });
+    }
+  }
+
+  Future<void> _handleQueueIntent() async {
+    final patientId = await _getPatientId();
+    if (patientId == null) {
+      setState(() {
+        _botMessages.add({
+          "text":
+              "I couldn’t find your account details. Please make sure you’re logged in first, ya.",
+          "isUser": false,
+          "time": _formatTime(DateTime.now()),
+        });
+      });
+      return;
+    }
+
+    try {
+      final uri = Uri.parse('$backendBaseUrl/queue_status')
+          .replace(queryParameters: {'patient_id': patientId});
+
+      final resp = await http.get(uri);
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+
+        if (data['status'] == 'no_active_queue') {
+          setState(() {
+            _botMessages.add({
+              "text":
+                  "Right now, I don’t see any active queue under your name. Please check in at the clinic counter to get a queue number.",
+              "isUser": false,
+              "time": _formatTime(DateTime.now()),
+            });
+          });
+          return;
+        }
+
+        final qNum = data['queue_number']?.toString() ?? '-';
+        final peopleAhead = data['people_ahead'] ?? 0;
+        final qStatus = data['queue_status']?.toString() ?? 'Unknown';
+        final estWait = data['estimated_wait_minutes'];
+
+        final buffer = StringBuffer();
+        buffer.writeln("Here is your current queue status:");
+        buffer.writeln("• Queue number : $qNum");
+        buffer.writeln("• People ahead : $peopleAhead");
+        buffer.writeln("• Status       : $qStatus");
+        if (estWait != null) {
+          buffer.writeln("• Est. wait    : ~$estWait minute(s)");
+        }
+
+        setState(() {
+          _botMessages.add({
+            "text": buffer.toString(),
+            "isUser": false,
+            "time": _formatTime(DateTime.now()),
+          });
+        });
+
+        if (widget.isOkuMode) {
+          _speak(
+              "Your queue number is $qNum. There are $peopleAhead people ahead of you. Status: $qStatus.");
+        }
+      } else {
+        setState(() {
+          _botMessages.add({
+            "text":
+                "I couldn’t load your queue details from the clinic system. Please try again in a bit.",
+            "isUser": false,
+            "time": _formatTime(DateTime.now()),
+          });
+        });
+      }
+    } catch (e) {
+      debugPrint("queue error: $e");
+      setState(() {
+        _botMessages.add({
+          "text":
+              "Oops! I had trouble checking your queue. Maybe the server went for a kopi break.",
           "isUser": false,
           "time": _formatTime(DateTime.now()),
         });
@@ -401,6 +532,118 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _handleBookingIntent() async {
+    final patientId = await _getPatientId();
+    if (patientId == null) {
+      setState(() {
+        _botMessages.add({
+          "text":
+              "I couldn’t find your account details. Please log in first before booking, ya.",
+          "isUser": false,
+          "time": _formatTime(DateTime.now()),
+        });
+      });
+      return;
+    }
+
+    setState(() {
+      _botMessages.add({
+        "text":
+            "Sure, let’s book an appointment. Please choose your preferred date and time.",
+        "isUser": false,
+        "time": _formatTime(DateTime.now()),
+      });
+    });
+
+    final picked = await _pickDateTime(context);
+    if (picked == null) {
+      setState(() {
+        _botMessages.add({
+          "text": "No date selected. Booking cancelled.",
+          "isUser": false,
+          "time": _formatTime(DateTime.now()),
+        });
+      });
+      return;
+    }
+
+    DateTime finalPicked = picked;
+
+    if (!_isWithinWorkingHours(finalPicked)) {
+      setState(() {
+        _botMessages.add({
+          "text":
+              "That time is outside clinic hours. Please pick a time between 9:00 AM and 9:30 PM.",
+          "isUser": false,
+          "time": _formatTime(DateTime.now()),
+        });
+      });
+
+      // Immediately let user pick again
+      final retry = await _pickDateTime(context);
+      if (retry == null) {
+        return;
+      }
+      if (!_isWithinWorkingHours(retry)) {
+        setState(() {
+          _botMessages.add({
+            "text":
+                "Still outside clinic hours. Please type 'book' again and choose a time within 9:00 AM–9:30 PM.",
+            "isUser": false,
+            "time": _formatTime(DateTime.now()),
+          });
+        });
+        return;
+      }
+
+      finalPicked = retry;
+    }
+
+    try {
+      final resp = await http.post(
+        Uri.parse('$backendBaseUrl/appointments/book'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'patient_id': patientId,
+          'preferred_datetime': finalPicked.toUtc().toIso8601String(),
+          // Later: add 'doctor_id' / 'service_id' when you have that context
+        }),
+      );
+
+      if (resp.statusCode == 200) {
+        setState(() {
+          _botMessages.add({
+            "text":
+                "Okay, I’ve submitted your booking request for ${_formatAppointmentDate(finalPicked.toIso8601String())}. The clinic will confirm it soon.",
+            "isUser": false,
+            "time": _formatTime(DateTime.now()),
+          });
+        });
+      } else {
+        final data = jsonDecode(resp.body);
+        final detail = data['detail']?.toString() ??
+            "I couldn’t create the booking just now. Please try again later or use the main booking page.";
+        setState(() {
+          _botMessages.add({
+            "text": detail,
+            "isUser": false,
+            "time": _formatTime(DateTime.now()),
+          });
+        });
+      }
+    } catch (e) {
+      debugPrint("booking error: $e");
+      setState(() {
+        _botMessages.add({
+          "text":
+              "There was a problem talking to the booking system. Please try again shortly.",
+          "isUser": false,
+          "time": _formatTime(DateTime.now()),
+        });
+      });
+    }
+  }
+
   Future<void> _sendMessage() async {
     final msg = _controller.text.trim();
     if (msg.isEmpty) return;
@@ -432,77 +675,93 @@ class _ChatScreenState extends State<ChatScreen> {
       final idx = int.parse(lower) - 1;
       if (idx >= 0 && idx < _lastAppointments.length) {
         _pendingRescheduleIndex = idx;
+
         setState(() {
           _botMessages.add({
-            "text":
-                "Okay, noted. Please type the new date and time in this format:\n\nYYYY-MM-DD HH:MM (24-hour, e.g. 2026-02-10 14:30).",
+            "text": "Okay, choose your new date and time from the picker.",
             "isUser": false,
             "time": _formatTime(DateTime.now()),
           });
         });
-      }
-      return;
-    }
 
-    // If an appointment is selected, next message is new datetime
-    if (_pendingRescheduleIndex != null && _pendingRescheduleIndex! >= 0) {
-      final newText = msg.trim();
-      try {
-        final dt = DateTime.parse(newText.replaceFirst(' ', 'T'));
-        final appt = _lastAppointments[_pendingRescheduleIndex!];
-        final apptId = appt['appointment_id'].toString();
-
-        final patientId = await _getPatientId();
-        if (patientId == null) {
-          setState(() {
-            _botMessages.add({
-              "text": "I couldn't verify your account. Please log in again.",
-              "isUser": false,
-              "time": _formatTime(DateTime.now()),
+        final ctx = context;
+        Future.microtask(() async {
+          final picked = await _pickDateTime(ctx);
+          if (picked == null) {
+            setState(() {
+              _botMessages.add({
+                "text":
+                    "No new date selected. We’ll keep your current appointment.",
+                "isUser": false,
+                "time": _formatTime(DateTime.now()),
+              });
             });
-          });
-          return;
-        }
+            _pendingRescheduleIndex = null;
+            return;
+          }
 
-        final resp = await http.post(
-          Uri.parse('$backendBaseUrl/appointments/reschedule'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'appointment_id': apptId,
-            'new_datetime': dt.toUtc().toIso8601String(),
-          }),
-        );
+          if (!_isWithinWorkingHours(picked)) {
+            setState(() {
+              _botMessages.add({
+                "text":
+                    "That time is outside clinic hours. Please pick a time between 9:00 AM and 9:30 PM.",
+                "isUser": false,
+                "time": _formatTime(DateTime.now()),
+              });
+            });
+            _pendingRescheduleIndex = null;
+            return;
+          }
 
-        if (resp.statusCode == 200) {
-          setState(() {
-            _botMessages.add({
-              "text":
-                  "All set. Your appointment has been rescheduled to ${_formatAppointmentDate(dt.toIso8601String())}.",
-              "isUser": false,
-              "time": _formatTime(DateTime.now()),
+          final appt = _lastAppointments[_pendingRescheduleIndex!];
+          final apptId = appt['appointment_id'].toString();
+
+          final patientId = await _getPatientId();
+          if (patientId == null) {
+            setState(() {
+              _botMessages.add({
+                "text": "I couldn't verify your account. Please log in again.",
+                "isUser": false,
+                "time": _formatTime(DateTime.now()),
+              });
             });
-          });
-        } else {
-          setState(() {
-            _botMessages.add({
-              "text":
-                  "I couldn't complete the reschedule. Please try again or contact the clinic.",
-              "isUser": false,
-              "time": _formatTime(DateTime.now()),
+            _pendingRescheduleIndex = null;
+            return;
+          }
+
+          final resp = await http.post(
+            Uri.parse('$backendBaseUrl/appointments/reschedule'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'appointment_id': apptId,
+              'new_datetime': picked.toUtc().toIso8601String(),
+            }),
+          );
+
+          if (resp.statusCode == 200) {
+            setState(() {
+              _botMessages.add({
+                "text":
+                    "All set. Your appointment has been rescheduled to ${_formatAppointmentDate(picked.toIso8601String())}.",
+                "isUser": false,
+                "time": _formatTime(DateTime.now()),
+              });
             });
-          });
-        }
-      } catch (e) {
-        setState(() {
-          _botMessages.add({
-            "text":
-                "Hmm, that date and time format looks off. Please use: YYYY-MM-DD HH:MM (e.g. 2026-02-10 14:30).",
-            "isUser": false,
-            "time": _formatTime(DateTime.now()),
-          });
+          } else {
+            final data = jsonDecode(resp.body);
+            final detail = data['detail']?.toString() ??
+                "I couldn't complete the reschedule. Please try again or contact the clinic.";
+            setState(() {
+              _botMessages.add({
+                "text": detail,
+                "isUser": false,
+                "time": _formatTime(DateTime.now()),
+              });
+            });
+          }
+
+          _pendingRescheduleIndex = null;
         });
-      } finally {
-        _pendingRescheduleIndex = null;
       }
       return;
     }
@@ -516,28 +775,16 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // Queue (placeholder)
+    // Queue → call backend
     if (lower.contains('queue')) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-      setState(() {
-        _botMessages.add({
-          "text":
-              "Okay, you want to check your queue, ya.\n\nOnce your check-in and queue number are recorded, I’ll show your position and estimated waiting time here.",
-          "isUser": false,
-          "time": _formatTime(DateTime.now()),
-        });
-      });
-      if (widget.isOkuMode) {
-        _speak(
-            "You are asking about your queue. I will show it here when it is available.");
-      }
+      await _handleQueueIntent();
       return;
     }
 
     // Reschedule / change appointment → guided flow
     if (lower.contains('reschedule') ||
-        lower.contains('change my appointment')) {
+        lower.contains('change my appointment') ||
+        lower.contains('change appointment')) {
       if (_lastAppointments.isEmpty) {
         await _handleAppointmentsIntent();
       }
@@ -567,6 +814,12 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    // Booking
+    if (lower.contains('book') || lower.contains('booking')) {
+      await _handleBookingIntent();
+      return;
+    }
+
     // Support / contact clinic / refund
     if (lower.contains('support') ||
         lower.contains('help') ||
@@ -583,7 +836,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await Future.delayed(const Duration(milliseconds: 700));
     if (mounted) {
       final reply =
-          "Sayang, I’ve received your message: \"$msg\".\n\nFor now, I understand best when you ask about *appointments*, *queue*, or *support*. You can also say things like:\n• \"Check my appointment\"\n• \"Check my queue\"\n• \"I want to change my appointment\"";
+          "Sayang, I’ve received your message: \"$msg\".\n\nFor now, I understand best when you ask about *appointments*, *queue*, *booking*, or *support*. You can also say things like:\n• \"Check my appointment\"\n• \"Check my queue\"\n• \"I want to change my appointment\"\n• \"Book appointment\"";
       setState(() {
         _botMessages.add({
           "text": reply,
@@ -593,7 +846,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       if (widget.isOkuMode) {
         _speak(
-            "I have received your message. Try asking about appointments, queue, or support.");
+            "I have received your message. Try asking about appointments, queue, booking, or support.");
       }
     }
   }
