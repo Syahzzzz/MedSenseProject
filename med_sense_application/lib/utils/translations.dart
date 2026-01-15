@@ -580,6 +580,5 @@ class AppTranslations {
       'queue_no': '排队号码',
       'please_stay_alert': '请留意您的号码。',
       'room': '房间',
-    },
-  };
+    },  };
 }

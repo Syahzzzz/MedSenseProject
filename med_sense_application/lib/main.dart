@@ -125,8 +125,6 @@ class MyApp extends StatelessWidget {
       valueListenable: appLanguageNotifier,
       builder: (context, language, child) {
         return MaterialApp(
-          // Adding key triggers a full rebuild when language changes
-          key: ValueKey(language), 
           title: 'MedSense',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
@@ -158,6 +156,17 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     _requestFilePermissions();
     _checkSession(); // Check for existing login on app start
+    appLanguageNotifier.addListener(_onLanguageChanged);
+  }
+
+  @override
+  void dispose() {
+    appLanguageNotifier.removeListener(_onLanguageChanged);
+    super.dispose();
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) setState(() {});
   }
 
   // --- Auto-Login / Quick PIN Logic ---

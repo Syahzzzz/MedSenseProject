@@ -241,7 +241,7 @@ async def reschedule_appointment(payload: RescheduleRequest):
     conflict_query = (
         db.table("Appointment")
         .select("appointment_id")
-        .eq("appointment_datetime", payload.new_datetime)
+        .eq("appointment_datetime", payload.new_datetime.isoformat())
         .in_("status", ["Scheduled", "Rescheduled", "Confirmed"])
     )
     if doctor_id:
@@ -292,7 +292,7 @@ async def book_appointment(payload: BookingRequest):
     conflict_query = (
         db.table("Appointment")
         .select("appointment_id")
-        .eq("appointment_datetime", payload.preferred_datetime)
+        .eq("appointment_datetime", payload.preferred_datetime.isoformat())
         .in_("status", ["Scheduled", "Rescheduled", "Confirmed"])
     )
     if payload.doctor_id:
@@ -310,7 +310,7 @@ async def book_appointment(payload: BookingRequest):
 
     insert_data = {
         "patient_id": payload.patient_id,
-        "appointment_datetime": payload.preferred_datetime,
+        "appointment_datetime": payload.preferred_datetime.isoformat(),
         "status": "Requested",
         "service_id": payload.service_id,
         "doctor_id": payload.doctor_id,

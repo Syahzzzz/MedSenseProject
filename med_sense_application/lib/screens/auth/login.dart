@@ -35,6 +35,7 @@ class _LoginPageState extends State<LoginPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSavedCredentials();
     });
+    appLanguageNotifier.addListener(_onLanguageChanged);
   }
 
   // --- Load Credentials & Check for PIN ---
@@ -72,9 +73,14 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    appLanguageNotifier.removeListener(_onLanguageChanged);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _handleLogin() async {

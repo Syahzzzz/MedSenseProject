@@ -272,6 +272,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (date == null) return null;
 
+    if (!context.mounted) return null;
+
     final TimeOfDay? time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(now),
@@ -555,6 +557,8 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     });
 
+    if (!mounted) return;
+
     final picked = await _pickDateTime(context);
     if (picked == null) {
       setState(() {
@@ -580,6 +584,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       // Immediately let user pick again
+      if (!mounted) return;
       final retry = await _pickDateTime(context);
       if (retry == null) {
         return;
@@ -686,6 +691,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
         final ctx = context;
         Future.microtask(() async {
+          if (!ctx.mounted) return;
           final picked = await _pickDateTime(ctx);
           if (picked == null) {
             setState(() {
