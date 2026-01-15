@@ -120,21 +120,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MedSense',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFBC02D),
-        ),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(),
-      builder: (context, child) {
-         return MediaQuery(
-           data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
-           child: child!,
-         );
+    // Wrap MaterialApp in ValueListenableBuilder to listen for language changes
+    return ValueListenableBuilder<String>(
+      valueListenable: appLanguageNotifier,
+      builder: (context, language, child) {
+        return MaterialApp(
+          // Adding key triggers a full rebuild when language changes
+          key: ValueKey(language), 
+          title: 'MedSense',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFFFBC02D),
+            ),
+            useMaterial3: true,
+          ),
+          home: const MyHomePage(),
+        );
       },
     );
   }
