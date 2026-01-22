@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:med_sense_application/services/notification_service.dart';
 
 class NotificationView extends StatefulWidget {
   const NotificationView({super.key});
@@ -14,6 +16,7 @@ class _NotificationViewState extends State<NotificationView> {
   bool _isLoading = true;
   bool _isOkuEnabled = false;
   List<Map<String, dynamic>> _notifications = [];
+  RealtimeChannel? _notificationChannel;
 
   // Theme Colors
   final Color _primaryYellow = const Color(0xFFFBC02D);
@@ -22,8 +25,23 @@ class _NotificationViewState extends State<NotificationView> {
   @override
   void initState() {
     super.initState();
+    _initializeService();
     _loadOkuSettings();
     _fetchNotifications();
+    _subscribeToNotifications();
+  }
+
+  @override
+  void dispose() {
+    if (_notificationChannel != null) {
+      _supabase.removeChannel(_notificationChannel!);
+    }
+    super.dispose();
+  }
+
+  Future<void> _initializeService() async {
+    await NotificationService().init();
+    await Permission.notification.request();
   }
 
   Future<void> _loadOkuSettings() async {
@@ -31,6 +49,45 @@ class _NotificationViewState extends State<NotificationView> {
     if (mounted) {
       setState(() {
         _isOkuEnabled = prefs.getBool('is_oku_enabled') ?? false;
+      });
+    }
+  }
+
+  void _subscribeToNotifications() {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    // Use a unique channel name for this view to avoid conflict with Dashboard
+    _notificationChannel = _supabase
+        .channel('public:Notification:${user.id}:view')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'Notification',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'recipient_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            _handleNewNotification(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
+  void _handleNewNotification(Map<String, dynamic> newRecord) {
+    // Show Local Notification (Restored to ensure delivery)
+    NotificationService().showNotification(
+      newRecord['notification_id'].hashCode,
+      'New Notification',
+      newRecord['message_content'] ?? 'You have a new message',
+    );
+
+    // Update UI immediately
+    if (mounted) {
+      setState(() {
+        _notifications.insert(0, newRecord);
       });
     }
   }

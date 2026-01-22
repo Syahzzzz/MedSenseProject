@@ -133,6 +133,41 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   Future<void> _initializeNotifications() async {
     await NotificationService().init();
     _setupRealtimeSubscription();
+    _checkMissedNotifications();
+  }
+
+  Future<void> _checkMissedNotifications() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Fetch recent unread notifications (limit to 3 to avoid spamming)
+      final response = await _supabase
+          .from('Notification')
+          .select()
+          .eq('recipient_id', user.id)
+          .eq('is_read', false)
+          .order('created_at', ascending: false)
+          .limit(3);
+
+      final List<dynamic> missed = response;
+      
+      if (missed.isNotEmpty) {
+        // We reverse to show oldest of the missed first, or just show them.
+        for (var note in missed) {
+          // Add a small delay to ensure they don't overlap too much in sound
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          NotificationService().showNotification(
+            (note['notification_id'] as String).hashCode,
+            'Missed Notification',
+            note['message_content'] ?? 'You have a new message',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking missed notifications: $e");
+    }
   }
 
   void _setupRealtimeSubscription() {
