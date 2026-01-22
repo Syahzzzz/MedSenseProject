@@ -192,6 +192,12 @@ class _BookingHistoryViewState extends State<BookingHistoryView> {
     String status = booking['status'] as String? ?? 'Unknown';
     String paymentStatus = booking['payment_status'] as String? ?? 'Unpaid'; // Default to Unpaid
     String notes = booking['notes'] as String? ?? ''; // Get notes
+    
+    // Clean internal tags from notes
+    if (notes.contains('[Location:')) {
+      notes = notes.replaceAll(RegExp(r'\[Location: .*?\]'), '').trim();
+    }
+    
     String paymentMethod = booking['payment_method'] as String? ?? '-';
     final serviceName = service['service_name'] as String? ?? 'Service'; // Needed for flat list context
     

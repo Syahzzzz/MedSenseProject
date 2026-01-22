@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:med_sense_application/screens/booking/reschedule_view.dart';
+import 'package:med_sense_application/utils/translations.dart';
 
 class AppointmentReceiptView extends StatefulWidget {
   final Map<String, dynamic> appointment;
@@ -286,8 +287,28 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
 
     final String status = apt['status'] ?? 'Pending';
     String paymentStatus = apt['payment_status'] ?? 'Unpaid';
-    final String notes = apt['notes'] ?? '';
+    String notes = apt['notes'] ?? '';
 
+    // Extract Location from Notes
+    String locationKey = 'dental_clinic_kl'; // Default Fallback
+    if (notes.contains('[Location:')) {
+      final RegExp regex = RegExp(r'\[Location: (.*?)\]');
+      final match = regex.firstMatch(notes);
+      if (match != null && match.group(1) != null) {
+        locationKey = match.group(1)!;
+        // Remove the tag from display notes
+        notes = notes.replaceAll(match.group(0)!, '').trim();
+      }
+    } else {
+      // Fallback logic based on doctor name if no tag (Legacy support)
+      final name = doctorName.toLowerCase();
+      if (name.contains('sarah') || name.contains('jane') || name.contains('lee')) {
+        locationKey = 'dental_clinic_rawang';
+      } else if (name.contains('ali') || name.contains('ahmad') || name.contains('tan')) {
+        locationKey = 'dental_clinic_selayang';
+      }
+    }
+    
     // Check if rescheduled before
     final bool hasRescheduled = notes.contains('[Reschedule Request:');
 
@@ -394,7 +415,7 @@ class _AppointmentReceiptViewState extends State<AppointmentReceiptView> {
                                                             _buildRow("Patient ID", patientId),
                                                             _buildRow("Status", status.toUpperCase(), isStatus: true),
                                                             _buildRow("Doctor", doctorName),
-                                                            _buildRow("Location", "Rawang Clinic"),                                
+                                                            _buildRow("Location", AppTranslations.get(locationKey)),                                
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 20.0),
                                 child: Divider(),

@@ -123,6 +123,9 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
         paymentStatus = 'Unpaid';
       }
 
+      // Store location in notes using a tag
+      final String locationNote = "[Location: ${widget.clinicNameKey}]";
+
       // 4. Insert Appointment
       final newAppointment = await _supabase.from('Appointment').insert({
         'patient_id': user.id,
@@ -133,6 +136,7 @@ class _ReviewConfirmViewState extends State<ReviewConfirmView> {
         'payment_status': paymentStatus,
         'payment_method': _paymentMethod,
         'predicted_wait_time_minutes': 0, 
+        'notes': locationNote,
       }).select().single();
 
       // Set notification flag for Dashboard

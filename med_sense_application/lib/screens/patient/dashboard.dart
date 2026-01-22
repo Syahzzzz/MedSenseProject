@@ -346,7 +346,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       // 1. Check existing active queue for today
       final existingQueue = await _supabase
           .from('QueueEntry')
-          .select('*, Doctor(name, specialization), Appointment(appointment_datetime, Service(service_name))')
+          .select('*, Doctor(name, specialization), Appointment(appointment_datetime, notes, Service(service_name))')
           .eq('patient_id', user.id)
           .gte('check_in_time', todayStart)
           .lt('check_in_time', tomorrowStart)
@@ -362,6 +362,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         final doctorId = existingQueue['doctor_id'];
         final currentStatus = existingQueue['status'] as String?;
         final doctorName = existingQueue['Doctor']?['name'] ?? 'Unknown';
+        final notes = existingQueue['Appointment']?['notes'] as String?;
         
         // STATUS CHANGE DETECTION (Serving)
         if (currentStatus == 'Serving' && _lastQueueStatus != 'Serving') {
@@ -381,7 +382,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             .eq('status', 'Waiting')
             .lt('queue_number', myQueueNum);
 
-        _calculateTrafficInfo(doctorName);
+        _calculateTrafficInfo(doctorName, notes);
 
         if (mounted) {
           setState(() {
@@ -435,11 +436,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               'queue_number': nextNum,
               'status': 'Waiting',
             })
-            .select('*, Doctor(name, specialization), Appointment(appointment_datetime, Service(service_name))')
+            .select('*, Doctor(name, specialization), Appointment(appointment_datetime, notes, Service(service_name))')
             .single();
         
         final doctorName = eligibleAppointment['Doctor']?['name'] ?? 'Unknown';
-        _calculateTrafficInfo(doctorName);
+        final notes = eligibleAppointment['notes'] as String?;
+        _calculateTrafficInfo(doctorName, notes);
         
         // New entry, so people ahead is likely 0 unless we query again, but let's assume 0 or query:
         // Actually, better to query to be safe
@@ -468,8 +470,17 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     }
   }
 
-  String _getClinicKeyForDoctor(String doctorName) {
-    // Mock Logic for Multi-Clinic Support
+  String _getClinicKeyForDoctor(String doctorName, [String? notes]) {
+    // 1. Check for explicit location in notes
+    if (notes != null && notes.contains('[Location:')) {
+      final RegExp regex = RegExp(r'\[Location: (.*?)\]');
+      final match = regex.firstMatch(notes);
+      if (match != null && match.group(1) != null) {
+        return match.group(1)!;
+      }
+    }
+
+    // 2. Mock Logic for Multi-Clinic Support (Fallback)
     final name = doctorName.toLowerCase();
     if (name.contains('sarah') || name.contains('jane') || name.contains('lee')) {
       return 'dental_clinic_rawang';
@@ -480,10 +491,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     }
   }
 
-  void _calculateTrafficInfo(String doctorName) {
+  void _calculateTrafficInfo(String doctorName, [String? notes]) {
     final now = DateTime.now();
     final hour = now.hour;
-    final clinicKey = _getClinicKeyForDoctor(doctorName);
+    final clinicKey = _getClinicKeyForDoctor(doctorName, notes);
     
     // Base Travel Time by Location (Mock)
     int baseMinutes = 20; // Rawang (Closest)
@@ -1208,7 +1219,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final doctorDisplay = doctorName.toString().startsWith("Dr.") ? doctorName : "Dr. $doctorName";
 
     // Clinic Name
-    final clinicKey = _getClinicKeyForDoctor(doctorName.toString());
+    final appointmentData = _queueData!['Appointment'] as Map<String, dynamic>?;
+    final notes = appointmentData?['notes'] as String?;
+    final clinicKey = _getClinicKeyForDoctor(doctorName.toString(), notes);
     final clinicName = AppTranslations.get(clinicKey);
 
     // Room Number
@@ -1589,8 +1602,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       children: [
                         Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
                         const SizedBox(width: 4),
-                        // Fetch clinic based on doctor
-                        Text(AppTranslations.get(_getClinicKeyForDoctor(doctorName)), style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500)),
+                        // Fetch clinic based on doctor and notes
+                        Text(AppTranslations.get(_getClinicKeyForDoctor(doctorName, apt['notes'])), style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ],

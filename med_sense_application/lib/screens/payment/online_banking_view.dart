@@ -94,6 +94,9 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
       // 3. Parse DateTime
       final DateTime fullDateTime = _parseDateTime(widget.date, widget.time);
       final String displayDate = "${widget.date.day}/${widget.date.month}/${widget.date.year}";
+      
+      // Store location in notes
+      final String locationNote = "[Location: ${widget.clinicNameKey}]";
 
       // 4. Insert Appointment
       final newAppointment = await _supabase.from('Appointment').insert({
@@ -105,6 +108,7 @@ class _OnlineBankingViewState extends State<OnlineBankingView> {
         'payment_status': 'Paid',
         'payment_method': 'Online Banking ($bankName)',
         'predicted_wait_time_minutes': 0, 
+        'notes': locationNote,
       }).select().single();
 
       // Set notification flag for Dashboard
