@@ -25,5 +25,4 @@ By leveraging **Artificial Intelligence**, MedSense predicts waiting times dynam
 
 * **Frontend:** Flutter (Dart)
 * **Backend:** Python - fastAPI
-* **AI/ML:** Scikit-learn and Pandas
 * **Database:** SupaBase
