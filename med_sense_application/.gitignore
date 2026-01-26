@@ -46,4 +46,4 @@ app.*.map.json
 .env
 
 #Supabase Architecture files
-SupabaseTableSchema/
+SupabaseTableSchema
